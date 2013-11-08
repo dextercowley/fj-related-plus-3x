@@ -142,7 +142,7 @@ class modFJRelatedPlusHelper
 				// if we are ignoring all keywords, $likes is empty
 				if (!$ignoreAllKeywords) {
 					foreach ($keys as $key) {
-						$likes[] = ',' . $db->getEscaped($key) . ','; // surround with commas so first and last items have surrounding commas
+						$likes[] = ',' . $db->escape($key) . ','; // surround with commas so first and last items have surrounding commas
 					}
 				}
 
@@ -404,7 +404,7 @@ class modFJRelatedPlusHelper
 	 * @param $rawText
 	 * @return string
 	 */
-	function getUpToLastSpace($rawText)
+	public static function getUpToLastSpace($rawText)
 	{
 		$throwAway = strrchr($rawText, ' ');
 		$endPosition = strlen($rawText) - strlen($throwAway);
@@ -418,7 +418,7 @@ class modFJRelatedPlusHelper
 	 * @param $maxLength max length
 	 * @return unknown_type
 	 */
-	function getPreview($rawText, $maxLength) {
+	public static function getPreview($rawText, $maxLength) {
 		$strippedText = substr(strip_tags($rawText), 0, $maxLength);
 		$strippedText = modFJRelatedPlusHelper::getUpToLastSpace($strippedText);
 		$j = 0; // counter in $rawText
@@ -459,7 +459,7 @@ class modFJRelatedPlusHelper
 	 *
 	 * returns boolean True if current view is an article
 	 */
-	function isArticle() {
+	public static function isArticle() {
 		$option = JRequest::getCmd('option');
 		$view = JRequest::getCmd('view');
 		$id	= JRequest::getInt('id');
@@ -472,8 +472,8 @@ class modFJRelatedPlusHelper
 	 * @param $buffer -- intro text to fix
 	 * @return $fixedText -- with image tags fixed for SEF
 	 */
-	function fixSefImages ($buffer) {
-		$config =& JFactory::getConfig();
+	public static function fixSefImages ($buffer) {
+		$config = JFactory::getConfig();
 		$sef = $config->get('config.sef');
 		if ($sef) // process if SEF option enabled
 		{
@@ -485,10 +485,10 @@ class modFJRelatedPlusHelper
 		return $buffer;
 	}
 
-	function dbQuote($string) {
-		if ($string) {
-			$db =& JFactory::getDBO();
-			$string = $db->Quote($string);
+	public static function dbQuote($string) {
+		if ($string)
+		{
+			$string = JFactory::getDBO()->quote($string);
 		}
 		return $string;
 	}
