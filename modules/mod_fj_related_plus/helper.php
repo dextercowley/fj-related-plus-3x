@@ -9,7 +9,7 @@
 // no direct access
 defined('_JEXEC') or die('Restricted access');
 
-require_once (JPATH_SITE.DS.'components'.DS.'com_content'.DS.'helpers'.DS.'route.php');
+require_once (JPATH_SITE .'/components/com_content/helpers/route.php');
 
 class modFJRelatedPlusHelper
 {
@@ -75,7 +75,7 @@ class modFJRelatedPlusHelper
 			$nullDate = $db->getNullDate();
 
 			$date = JFactory::getDate();
-			$now  = $date->toMySQL();
+			$now  = $date->toSQL();
 
 			$related			= array();
 			$matching_keywords 	= array();
@@ -474,7 +474,7 @@ class modFJRelatedPlusHelper
 	 */
 	function fixSefImages ($buffer) {
 		$config =& JFactory::getConfig();
-		$sef = $config->getValue('config.sef');
+		$sef = $config->get('config.sef');
 		if ($sef) // process if SEF option enabled
 		{
 			$base   = JURI::base(true).'/';
