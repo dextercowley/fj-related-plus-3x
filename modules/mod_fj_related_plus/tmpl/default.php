@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * @version		$Id: default.php 13 2009-07-07 22:23:18Z dextercowley $
  * @package		mod_fj_related_plus
@@ -15,10 +15,10 @@ $dateFormat = $params->def('date_format', JText::_('DATE_FORMAT_LC4'));
 $showTooltip = $params->get('show_tooltip', '1');
 $titleLinkable = $params->get('fj_title_linkable'); ?>
 
-<?php if ($subtitle) : ?> 
+<?php if ($subtitle) : ?>
 	<p class="relateditems<?php echo $params->get('moduleclass_sfx'); ?>">
 	<?php echo $subtitle; ?></p><br />
-<?php endif; ?> 
+<?php endif; ?>
 <?php if (count($list)) : ?>
 	<ul class="relateditems<?php echo $params->get('moduleclass_sfx'); ?>">
 	<?php foreach ($list as $item) : ?>
@@ -26,20 +26,25 @@ $titleLinkable = $params->get('fj_title_linkable'); ?>
 		<?php if (($showTooltip) && ($titleLinkable)) : ?>
 			<a href="<?php echo $item->route; ?>" class="fj_relatedplus<?php echo $params->get('moduleclass_sfx'); ?>">
 			<span class="hasTip" title="<?php echo htmlspecialchars($item->title);?>::<?php echo $item->introtext; ?>">
-			<?php echo $item->title; 
-			if ($showDate) echo ' - ' . JHTML::_('date', $item->date, $dateFormat);
-			if ($showCount) {
-				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' : 
-					' (' . $item->match_count . ' ' . JText::_('matches') . ')';
-			} ?>
-			</span></a>	
+
+			<?php if ($showDate) : ?>
+				<?php $dateString = JHTML::_('date', $item->date, $dateFormat); ?>
+				<?php echo JText::sprintf('MOD_FJRELATEDPLUS_DATE', $item->title, $dateString); ?>
+			<?php else : ?>
+				<?php echo $item->title; ?>
+			<?php endif; ?>
+			<?php if ($showCount) : ?>
+				<?php echo JText::plural('MOD_FJRELATEDPLUS_N_MATCHES', $item->match_count); ?>
+			<?php endif; ?>
+
+			</span></a>
 		<?php endif; ?>
 		<?php if (!($showTooltip) && ($titleLinkable)) :?>
 			<a href="<?php echo $item->route; ?>" class="fj_relatedplus<?php echo $params->get('moduleclass_sfx'); ?>">
-		 	<?php echo $item->title; 
+		 	<?php echo $item->title;
 			if ($showDate) echo ' - ' . JHTML::_('date', $item->date, $dateFormat);
 			if ($showCount) {
-				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' : 
+				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' :
 					' (' . $item->match_count . ' ' . JText::_('matches') . ')';
 			} ?>
 			</a>
@@ -48,25 +53,25 @@ $titleLinkable = $params->get('fj_title_linkable'); ?>
 		<?php if (($showTooltip) && !($titleLinkable)) : ?>
 			<span class="fj_relatedplus<?php echo $params->get('moduleclass_sfx'); ?>">
 			<span class="hasTip" title="<?php echo htmlspecialchars($item->title);?>::<?php echo $item->introtext; ?>">
-			<?php echo $item->title; 
+			<?php echo $item->title;
 			if ($showDate) echo ' - ' . JHTML::_('date', $item->date, $dateFormat);
 			if ($showCount) {
-				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' : 
+				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' :
 					' (' . $item->match_count . ' ' . JText::_('matches') . ')';
 			} ?>
-			</span></span>	
-		<?php endif; ?>	
+			</span></span>
+		<?php endif; ?>
 
 		<?php if (!($showTooltip) && !($titleLinkable)) : ?>
 			<span class="fj_relatedplus<?php echo $params->get('moduleclass_sfx'); ?>">
-			<?php echo $item->title; 
+			<?php echo $item->title;
 			if ($showDate) echo ' - ' . JHTML::_('date', $item->date, $dateFormat);
 			if ($showCount) {
-				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' : 
+				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' :
 					' (' . $item->match_count . ' ' . JText::_('matches') . ')';
 			} ?>
-			</span>	
-		<?php endif; ?>	
+			</span>
+		<?php endif; ?>
 
 		<?php if($showMatchList) : ?>
 			<ul>

@@ -24,15 +24,11 @@
 	<help url="FJ_RELATED_PLUS_HELP_URL" />
 	<config>
 		<fields name="params">
-			<fieldset name="basic" addpath="/modules/mod_fj_related_plus/fields">
+			<fieldset name="layout" >
 				<field name="count" type="text" default="5" label="Count" description="PARAMARTICLECOUNT" />
 				<field name="minimumMatches" type="text" default="1" label="Minimum_Matches" description="PARAMFJMINIMUMMATCHES" />		
   				<field type="spacer" hr="true" />
-   				<field type="spacer" label="SPACERLIMITDESC" />
-				<field name="catid" type="category" extension="com_content" multiple="multiple" size="5" label="Categories" description="FJ_RELATED_PARAMCATEGORIES"/>
-			</fieldset>
-			<fieldset name="layout" >
-				<field name="ordering" type="list" default="alpha" label="Ordering" description="PARAMORDERING">
+ 				<field name="ordering" type="list" default="alpha" label="Ordering" description="PARAMORDERING">
 					<option value="alpha">Title_Alphabetical</option>
 					<option value="rdate">Recently_Added_First</option>
 					<option value="date">Oldest_First</option>
@@ -59,6 +55,10 @@
 				<field name="keywordLabel" type="text" default="" size = "30" label="Keyword_Label" description="PARAMKEYWORDLABEL" />
 				<field name="notArticleText" type="text" default="" size = "50" label="Text_If_Not_An_Article" description="PARAMNOTARTICLETEXT" />		
 				<field name="noRelatedText" type="text" default="" size = "50" label="Text_If_No_Related" description="PARAMNORELATEDTEXT" />		
+			</fieldset>
+			<fieldset name="filter" >
+				<field type="spacer" label="SPACERLIMITDESC" />
+				<field name="catid" type="category" extension="com_content" multiple="multiple" size="5" label="Categories" description="FJ_RELATED_PARAMCATEGORIES"/>			
 			</fieldset>
 			<fieldset name="include" >
 				<field type="spacer" label="FJSPACERINCLUDEALLDESC" />
