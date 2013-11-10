@@ -28,7 +28,7 @@ class modFJRelatedPlusHelper
 	{
 		$includeMenuTypes = $params->get('fj_menu_item_types', 'article');
 		// only do this if this is an article or if we are showing this module for any menu item type
-		if (modFJRelatedPlusHelper::isArticle() || ($includeMenuTypes == 'any')) //only show for article pages
+		if (self::isArticle() || ($includeMenuTypes == 'any')) //only show for article pages
 		{
 			$db	= JFactory::getDBO();
 			$user = JFactory::getUser();
@@ -66,8 +66,8 @@ class modFJRelatedPlusHelper
 				? implode(',', $params->get('fj_include_authors')) : $params->get('fj_include_authors');
 			// put quotes around
 			$includeAliases	= (is_array($params->get('fj_include_alias')))
-				? implode(',', array_map(array('modFJRelatedPlusHelper', 'dbQuote'), $params->get('fj_include_alias')))
-				: modFJRelatedPlusHelper::dbQuote($params->get('fj_include_alias'));
+				? implode(',', array_map(array('self', 'dbQuote'), $params->get('fj_include_alias')))
+				: self::dbQuote($params->get('fj_include_alias'));
 			$includeCategoriesCondition = '';
 			$includeAuthorCondition = '';
 			$includeAliasCondition = '';
@@ -84,7 +84,7 @@ class modFJRelatedPlusHelper
 			$temp				= explode(':', $temp);
 			$id					= $temp[0];
 
-			if (modFJRelatedPlusHelper::isArticle()) {
+			if (self::isArticle()) {
 				// select the meta keywords and author info from the item
 				$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
 					' cc.title as category_title, u.name as author ' .
@@ -102,9 +102,9 @@ class modFJRelatedPlusHelper
 					'created_by' => '');
 				$mainArticle = JArrayHelper::toObject($articleArray);
 			}
-			modFJRelatedPlusHelper::$mainArticleAlias = $mainArticle->created_by_alias;
-			modFJRelatedPlusHelper::$mainArticleAuthor = $mainArticle->author;
-			modFJRelatedPlusHelper::$mainArticleCategory = $mainArticle->category_title;
+			self::$mainArticleAlias = $mainArticle->created_by_alias;
+			self::$mainArticleAuthor = $mainArticle->author;
+			self::$mainArticleCategory = $mainArticle->category_title;
 			$metakey = trim($mainArticle->metakey);
 
 			if (($metakey) || 	// do the query if there are keywords
@@ -121,9 +121,9 @@ class modFJRelatedPlusHelper
 
 				// get array of keywords to ignore
 				$ignoreKeywordArray = array();
-				if ($ignoreKeywords) {
-					$ignoreKeywordArray =
-					modFJRelatedPlusHelper::cleanKeywordList($ignoreKeywords);
+				if ($ignoreKeywords)
+				{
+					$ignoreKeywordArray = self::cleanKeywordList($ignoreKeywords);
 				}
 
 				// put only good keys in $keys array
@@ -135,7 +135,7 @@ class modFJRelatedPlusHelper
 						$keys[] = $key;
 					}
 				}
-				modFJRelatedPlusHelper::$mainArticleKeywords = $keys;
+				self::$mainArticleKeywords = $keys;
 				$likes = array ();
 
 				// create likes array for query -- only if we are not ignoring all keywords
@@ -289,15 +289,24 @@ class modFJRelatedPlusHelper
 							foreach ($temp as $row) // loop through each related article
 							{
 								$rowkeywords = explode(',', trim($row->metakey)); // create array of current article's keyword phrases
-								foreach ($rowkeywords as $keyword ) // loop through each keyword phrase of this related article
+
+								// Don't do this if we are ignoring all keywords
+								if (! $ignoreAllKeywords)
 								{
-									foreach ($keys as $nextkey) // loop through each keyword phrase of the main article
+									foreach ($rowkeywords as $keyword) // loop through each keyword phrase of this related article
 									{
-										if ((trim($keyword)) // only test if there is at least one keyword
-										&& (JString::strtoupper(trim($keyword)) == JString::strtoupper(trim($nextkey)))) // test key match (ignore case)
+										// Check that keyword is not in ignore list
+										if (!in_array($keyword, $ignoreKeywordArray))
 										{
-											$row->match_count++; // if match, increment counter
-											$matching_keywords[] = trim($keyword); // if match, add this phrase to list of matches
+											foreach ($keys as $nextkey) // loop through each keyword phrase of the main article
+											{
+												// only test if there is at least one keyword
+												if ((trim($keyword)) && (JString::strtoupper(trim($keyword)) == JString::strtoupper(trim($nextkey)))) // test key match (ignore case)
+												{
+													$row->match_count ++; // if match, increment counter
+													$matching_keywords[] = trim($keyword); // if match, add this phrase to list of matches
+												}
+											}
 										}
 									}
 								}
@@ -345,7 +354,7 @@ class modFJRelatedPlusHelper
 
 						if ($orderBy == 'bestmatch') // need to sort now that we have the count of keyword matches
 						{
-							usort($temp, array('modFJRelatedPlusHelper', 'reverseSort'));
+							usort($temp, array('self', 'reverseSort'));
 						}
 
 						$ii = 1;
@@ -358,11 +367,11 @@ class modFJRelatedPlusHelper
 								if ($showTooltip) {
 									// limit introtext to length if parameter set & it is needed
 									$strippedText = strip_tags($row->introtext);
-									$row->introtext = modFJRelatedPlusHelper::fixSefImages($row->introtext);
+									$row->introtext = self::fixSefImages($row->introtext);
 									if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit)) {
 										$row->introtext =
 										htmlspecialchars(
-										modFJRelatedPlusHelper::getPreview($row->introtext, $tooltipLimit)) . ' ...';
+										self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
 									}
 									else {
 										$row->introtext = htmlspecialchars($row->introtext);
@@ -384,7 +393,7 @@ class modFJRelatedPlusHelper
 		}
 	}
 
-	function reverseSort ($row1, $row2) // comp
+	public static function reverseSort ($row1, $row2) // comp
 	{
 		if ($row1->match_count == $row2->match_count) // sort by title within match_count (if same # matches)
 		{
@@ -420,7 +429,7 @@ class modFJRelatedPlusHelper
 	 */
 	public static function getPreview($rawText, $maxLength) {
 		$strippedText = substr(strip_tags($rawText), 0, $maxLength);
-		$strippedText = modFJRelatedPlusHelper::getUpToLastSpace($strippedText);
+		$strippedText = self::getUpToLastSpace($strippedText);
 		$j = 0; // counter in $rawText
 		// find the position in $rawText corresponding to the end of $strippedText
 		for ($i = 0; $i < strlen($strippedText); $i++) {
@@ -441,7 +450,7 @@ class modFJRelatedPlusHelper
 	 * returns array() of clean keywords
 	 *
 	 */
-	function cleanKeywordList($rawList) {
+	public static function cleanKeywordList($rawList) {
 		$bad_characters = array("\n", "\r", "\"", "<", ">"); // array of characters to remove
 		$after_clean = JString::str_ireplace($bad_characters, "", $rawList); // remove bad characters
 		$keys = explode(',', $after_clean); // create array using commas as delimiter
