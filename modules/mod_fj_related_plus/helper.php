@@ -23,6 +23,7 @@ class modFJRelatedPlusHelper
 	static $mainArticleAlias = null;
 	static $mainArticleAuthor = null;
 	static $mainArticleCategory = null;
+	static $includeKeywordArray = array();
 
 	public static function getList($params)
 	{
@@ -129,12 +130,11 @@ class modFJRelatedPlusHelper
 					$ignoreKeywordArray = self::cleanKeywordList($ignoreKeywords);
 				}
 
-				$includeKeywordArray = array();
 				if ($includeKeywords)
 				{
-					$includeKeywordArray = self::cleanKeywordList($includeKeywords);
+					self::$includeKeywordArray = self::cleanKeywordList($includeKeywords);
 				}
-				$includeKeywordCount = count($includeKeywordArray);
+				$includeKeywordCount = count(self::$includeKeywordArray);
 
 				// put only good keys in $keys array
 				// good = non-blank and not in ignore list
@@ -157,7 +157,7 @@ class modFJRelatedPlusHelper
 				}
 
 				// Process include_keywords
-				foreach ($includeKeywordArray as $includeKeyword)
+				foreach (self::$includeKeywordArray as $includeKeyword)
 				{
 					$likes[] = ',' . $db->escape($includeKeyword) . ',';
 				}
@@ -371,7 +371,7 @@ class modFJRelatedPlusHelper
 									foreach ($rowkeywords as $rowKey)
 									{
 										$cleanRowKey = JString::trim(JString::strtoupper($rowKey));
-										if (!in_array($cleanRowKey, $cleanMatchingKeys) && in_array($cleanRowKey, $includeKeywordArray))
+										if (!in_array($cleanRowKey, $cleanMatchingKeys) && in_array($cleanRowKey, self::$includeKeywordArray))
 										{
 											$matching_keywords[] = $rowKey;
 											$row->match_count++;
