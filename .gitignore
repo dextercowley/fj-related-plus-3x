@@ -83,6 +83,7 @@
 /modules/mod_custom/
 /modules/mod_feed/
 /modules/mod_finder/
+/modules/mod_fj_related_plus/update/*.zip
 /modules/mod_footer/
 /modules/mod_languages/
 /modules/mod_login/
