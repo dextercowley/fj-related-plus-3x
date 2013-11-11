@@ -59,6 +59,7 @@ class modFJRelatedPlusHelper
 
 			$ignoreKeywords = $params->get('ignore_keywords', '');
 			$ignoreAllKeywords = $params->get('ignore_all_keywords', 0);
+			$includeKeywords = $params->get('include_keywords');
 
 			$includeCategories = (is_array($params->get('fj_include_categories')))
 				? implode(',', $params->get('fj_include_categories')) : $params->get('fj_include_categories');
@@ -114,7 +115,9 @@ class modFJRelatedPlusHelper
 				($matchCategory) ||	// or if the match category parameter is yes
 				($includeCategories > ' ') || // or other categories
 				($includeAuthors > ' ') || // or other authors
-				($includeAliases > ' ')) // or other author aliases
+				($includeAliases > ' ') || // or other author aliases
+				($includeKeywords)) // or include keywords
+
 			{
 				// explode the meta keys on a comma
 				$rawKeys = explode(',', $metakey);
@@ -125,6 +128,13 @@ class modFJRelatedPlusHelper
 				{
 					$ignoreKeywordArray = self::cleanKeywordList($ignoreKeywords);
 				}
+
+				$includeKeywordArray = array();
+				if ($includeKeywords)
+				{
+					$includeKeywordArray = self::cleanKeywordList($includeKeywords);
+				}
+				$includeKeywordCount = count($includeKeywordArray);
 
 				// put only good keys in $keys array
 				// good = non-blank and not in ignore list
@@ -144,6 +154,12 @@ class modFJRelatedPlusHelper
 					foreach ($keys as $key) {
 						$likes[] = ',' . $db->escape($key) . ','; // surround with commas so first and last items have surrounding commas
 					}
+				}
+
+				// Process include_keywords
+				foreach ($includeKeywordArray as $includeKeyword)
+				{
+					$likes[] = ',' . $db->escape($includeKeyword) . ',';
 				}
 
 				if ((count($likes)) || //the current article has keywords or we are matching on author
@@ -291,7 +307,7 @@ class modFJRelatedPlusHelper
 								$rowkeywords = explode(',', trim($row->metakey)); // create array of current article's keyword phrases
 
 								// Don't do this if we are ignoring all keywords
-								if (! $ignoreAllKeywords)
+								if (!$ignoreAllKeywords)
 								{
 									foreach ($rowkeywords as $keyword) // loop through each keyword phrase of this related article
 									{
@@ -329,22 +345,38 @@ class modFJRelatedPlusHelper
 								}
 
 								if (($includeCategories > ' ')
-								&& (in_array($row->catid, explode(',', $includeCategories)))
-								&& !(($row->catid == $mainArticle->catid) && ($matchCategory))) {
+										&& (in_array($row->catid, explode(',', $includeCategories)))
+										&& !(($row->catid == $mainArticle->catid) && ($matchCategory))) {
 									$row->match_count++;
 									$matching_keywords[] = ($row->catid == 0) ? JText::_('Uncategorised') : trim($row->category_title);
 								}
 								if (($includeAliases)
-								&& (in_array($db->Quote($row->created_by_alias), explode(',', $includeAliases)))
-								&& !(($row->created_by_alias == $mainArticle->created_by_alias) && ($matchAuthorAlias))) {
+										&& (in_array($db->Quote($row->created_by_alias), explode(',', $includeAliases)))
+										&& !(($row->created_by_alias == $mainArticle->created_by_alias) && ($matchAuthorAlias))) {
 									$row->match_count++;
 									$matching_keywords[] = $row->created_by_alias;
 								}
 								else if (($includeAuthors)
-								&& (in_array($row->created_by, explode(',', $includeAuthors)))
-								&& !(($row->created_by == $mainArticle->created_by) && ($matchAuthor))) {
+										&& (in_array($row->created_by, explode(',', $includeAuthors)))
+										&& !(($row->created_by == $mainArticle->created_by) && ($matchAuthor))) {
 									$row->match_count++;
 									$matching_keywords[] = $row->author;
+								}
+
+								// Process included keywords
+								if ($includeKeywordCount > 0)
+								{
+									$cleanMatchingKeys = self::cleanKeywordList(implode(',', $matching_keywords));
+									$cleanRowKeys = self::cleanKeywordList(implode(',', $rowkeywords));
+									foreach ($rowkeywords as $rowKey)
+									{
+										$cleanRowKey = JString::trim(JString::strtoupper($rowKey));
+										if (!in_array($cleanRowKey, $cleanMatchingKeys) && in_array($cleanRowKey, $includeKeywordArray))
+										{
+											$matching_keywords[] = $rowKey;
+											$row->match_count++;
+										}
+									}
 								}
 
 								$row->match_list = $matching_keywords; // save all of the matches for the current row
@@ -494,11 +526,13 @@ class modFJRelatedPlusHelper
 		return $buffer;
 	}
 
-	public static function dbQuote($string) {
+	public static function dbQuote($string)
+	{
 		if ($string)
 		{
 			$string = JFactory::getDBO()->quote($string);
 		}
 		return $string;
 	}
+
 }

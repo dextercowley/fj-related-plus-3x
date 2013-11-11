@@ -104,7 +104,8 @@
 				<field name="ignore_all_keywords" type="radio" default="0" label="Ignore_All_Keywords" description="FJRELATEDPARAMIGNOREALL" >
 					<option value="0">JNO</option>
 					<option value="1">JYES</option>		
-				</field>		
+				</field>
+				<field name="include_keywords" type="textarea" rows="3" cols="30" default="" label="FJ_RELATED_PLUS_INCLUDE_KEYWORDS" description="FJ_RELATED_PLUS_INCLUDE_KEYWORDS_DESC" />	
 			</fieldset>
 			<fieldset name="advanced" addpath="/modules/mod_fj_related_plus/elements">
 				<field name="fj_title_linkable" type="radio" default="1" label="Title_Linkable" description="FJRELATEDPARAMTITLELINKABLE" >
