@@ -24,7 +24,7 @@
 	<help url="FJ_RELATED_PLUS_HELP_URL" />
 	<updateservers>
 		<server type="extension" priority="1" name="FJ Related Plus Module"
-			>https://raw.github.com/dextercowley/fj-related-plus-3x/master/modules/mod_fj_related_plus/update/com_fjrelated_update.xml</server>
+			>http://raw.github.com/dextercowley/fj-related-plus-3x/master/modules/mod_fj_related_plus/update/mod_fj_related_plus_update.xml</server>
 	</updateservers>
 	<config>
 		<fields name="params">
