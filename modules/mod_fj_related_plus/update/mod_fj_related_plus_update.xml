@@ -5,6 +5,7 @@
 		<description>FJ Related Plus Module Version 3.x</description>
 		<element>mod_fj_related_plus</element>
 		<type>module</type>
+		<client>0</client>
 		<!-- This will be the component version after the update. -->
 		<version>3.0.1</version>
 		<infourl title="FJ Related">http://joomlacode.org/gf/project/freejoomla/</infourl>
