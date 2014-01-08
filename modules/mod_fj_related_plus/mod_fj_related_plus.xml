@@ -38,7 +38,7 @@
 					<option value="date">Oldest_First</option>
 					<option value="bestmatch">Most_Matches_First</option>
 					<option value="article_order">Article_Manager_Order</option>
-					<option value="keyword_article">Keyword_Alphabetical</option>
+					<option value="tag_article">FJ_RELATED_PLUS_TAG_ARTICLE</option>
 					<option value="random">Random</option>
 	  			</field>
 				<field name="showDate" type="list" default="none" label="Article_date" description="FJRELATEDPARAMDATE">
@@ -56,7 +56,7 @@
 					<option value="0">JHIDE</option>
 					<option value="1">JSHOW</option>
 				</field>
-				<field name="keywordLabel" type="text" default="" size = "30" label="Keyword_Label" description="PARAMKEYWORDLABEL" />
+				<field name="tagLabel" type="text" default="" size = "30" label="FJ_RELATED_PLUS_TAG_LABEL_LABEL" description="FJ_RELATED_PLUS_TAG_LABEL_DESC" />
 				<field name="notArticleText" type="text" default="" size = "50" label="Text_If_Not_An_Article" description="PARAMNOTARTICLETEXT" />		
 				<field name="noRelatedText" type="text" default="" size = "50" label="Text_If_No_Related" description="PARAMNORELATEDTEXT" />		
 			</fieldset>
@@ -103,13 +103,13 @@
 				<field name="max_chars" type="text" default="250" label="TOOLTIP_MAXIMUM_LENGTH" description="FJRELATEDMAXCHARS" />		
 
 			</fieldset>
-			<fieldset name="keyword" >
-				<field name="ignore_keywords" type="textarea" rows="3" cols="30" default="" label="Keywords_to_Ignore" description="FJRELATEDIGNORE" />
-				<field name="ignore_all_keywords" type="radio" default="0" label="Ignore_All_Keywords" description="FJRELATEDPARAMIGNOREALL" >
+			<fieldset name="tag" >
+				<field name="ignore_tags" type="tag" custom="deny" multiple="true" rows="3" cols="30" default="" label="FJ_RELATED_PLUS_TAGS_TO_IGNORE_LABEL" description="FJ_RELATED_PLUS_TAGS_TO_IGNORE_DESC" />
+				<field name="ignore_all_tags" type="radio" default="0" label="FJ_RELATED_PLUS_IGNORE_ALL_TAGS_LABEL" description="FJ_RELATED_PLUS_IGNORE_ALL_TAGS_DESC" >
 					<option value="0">JNO</option>
 					<option value="1">JYES</option>		
 				</field>
-				<field name="include_keywords" type="textarea" rows="3" cols="30" default="" label="FJ_RELATED_PLUS_INCLUDE_KEYWORDS" description="FJ_RELATED_PLUS_INCLUDE_KEYWORDS_DESC" />	
+				<field name="include_tags" type="tag" custom="deny" multiple="true" rows="3" cols="30" default="" label="FJ_RELATED_PLUS_INCLUDE_TAGS_LABEL" description="FJ_RELATED_PLUS_INCLUDE_TAGS_DESC" />	
 			</fieldset>
 			<fieldset name="advanced" addpath="/modules/mod_fj_related_plus/elements">
 				<field name="fj_title_linkable" type="radio" default="1" label="Title_Linkable" description="FJRELATEDPARAMTITLELINKABLE" >
