@@ -14,16 +14,17 @@ require_once (JPATH_SITE .'/components/com_content/helpers/route.php');
 class modFJRelatedPlusHelper
 {
 	/**
-	 * The keywords from the Main Article
+	 * The tags from the Main Article
 	 *
 	 * @access public
-	 * @var string array
+	 * @var array
 	 */
-	static $mainArticleKeywords = null;
+	static $mainArticleTags = array();
+	static $mainArticleTagNames = array();
 	static $mainArticleAlias = null;
 	static $mainArticleAuthor = null;
 	static $mainArticleCategory = null;
-	static $includeKeywordArray = array();
+	static $includeTagArray = array();
 
 	public static function getList($params)
 	{
@@ -38,10 +39,9 @@ class modFJRelatedPlusHelper
 			$showDate = $params->get('showDate', 'none');
 			$showLimit = intval($params->get('count', 5));
 			$minimumMatches = intval($params->get('minimumMatches', 1));
-			$showCount = $params->def('showMatchCount', 0);
-			$showMatchList = $params->def('showMatchList', 0);
+			$showCount = $params->get('showMatchCount', 0);
+			$showMatchList = $params->get('showMatchList', 0);
 			$orderBy = $params->get('ordering', 'alpha');
-			$random = ($orderBy == 'random') ? ' rand() as random, ' : '';
 
 			// process categories either as comma-delimited list or as array
 			// (for backward compatibility)
@@ -54,13 +54,14 @@ class modFJRelatedPlusHelper
 			$matchAuthorAliasCondition = '';
 			$matchCategory = $params->get('fjmatchCategory');
 			$matchCategoryCondition = '';
+			$anyOrAll = $params->get('anyOrAll', 'any');
 
 			$showTooltip = $params->get('show_tooltip', 1);
 			$tooltipLimit = (int) $params->get('max_chars', 250);
 
-			$ignoreKeywords = $params->get('ignore_keywords', '');
-			$ignoreAllKeywords = $params->get('ignore_all_keywords', 0);
-			$includeKeywords = $params->get('include_keywords');
+			$ignoreTags = $params->get('ignore_tags', '');
+			$ignoreAllTags = $params->get('ignore_all_tags', 0);
+			$includeTags = $params->get('include_tags');
 
 			$includeCategories = (is_array($params->get('fj_include_categories')))
 				? implode(',', $params->get('fj_include_categories')) : $params->get('fj_include_categories');
@@ -70,24 +71,19 @@ class modFJRelatedPlusHelper
 			$includeAliases	= (is_array($params->get('fj_include_alias')))
 				? implode(',', array_map(array('self', 'dbQuote'), $params->get('fj_include_alias')))
 				: self::dbQuote($params->get('fj_include_alias'));
-			$includeCategoriesCondition = '';
-			$includeAuthorCondition = '';
-			$includeAliasCondition = '';
 
 			$nullDate = $db->getNullDate();
 
 			$date = JFactory::getDate();
 			$now  = $date->toSQL();
 
-			$related			= array();
-			$matching_keywords 	= array();
+			$related = array();
+			$matching_tags = array();
 			$metakey = '';
-			$temp				= JRequest::getString('id');
-			$temp				= explode(':', $temp);
-			$id					= $temp[0];
+			$id = JFactory::getApplication()->input->getInt('id');
 
 			if (self::isArticle()) {
-				// select the meta keywords and author info from the item
+				// select the author info from the item
 				$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
 					' cc.title as category_title, u.name as author ' .
 					' FROM #__content AS a' .
@@ -96,8 +92,28 @@ class modFJRelatedPlusHelper
 					' WHERE a.id = '.(int) $id;
 				$db->setQuery($query);
 				$mainArticle = $db->loadObject();
+
+				// Get tags for this article.
+				// Load the tags from the mapping table
+				$query = $db->getQuery(true);
+				$query->select('t.id, t.title')
+					->from('#__tags AS t')
+					->innerJoin('#__contentitem_tag_map AS m ON t.id = m.tag_id')
+					->where("m.type_alias = 'com_content.article'")
+					->where('content_item_id = ' . $id)
+					->order('t.title ASC');
+				$db->setQuery($query);
+				$tagObjects = $db->loadObjectList();
+				foreach ($tagObjects as $tagObject)
+				{
+					self::$mainArticleTags[] = $tagObject->id;
+					self::$mainArticleTagNames[] = $tagObject->title;
+				}
+
+
 			}
-			else {
+			else
+			{
 				// create an empty article object
 				$articleArray = array('created_by_alias' =>'', 'author' =>'',
 					'category_title' => '', 'metakey' => '', 'catid' => '',
@@ -107,9 +123,8 @@ class modFJRelatedPlusHelper
 			self::$mainArticleAlias = $mainArticle->created_by_alias;
 			self::$mainArticleAuthor = $mainArticle->author;
 			self::$mainArticleCategory = $mainArticle->category_title;
-			$metakey = trim($mainArticle->metakey);
 
-			if (($metakey) || 	// do the query if there are keywords
+			if ((count(self::$mainArticleTags) > 0) || 	// do the query if there are tags
 				($matchAuthor) || // or if the author match is on
 				// or if the alias match is on and an alias
 				(($matchAuthorAlias) && ($mainArticle->created_by_alias)) ||
@@ -117,279 +132,177 @@ class modFJRelatedPlusHelper
 				($includeCategories > ' ') || // or other categories
 				($includeAuthors > ' ') || // or other authors
 				($includeAliases > ' ') || // or other author aliases
-				($includeKeywords)) // or include keywords
-
+				($includeTags)) // or include tags
 			{
-				// explode the meta keys on a comma
-				$rawKeys = explode(',', $metakey);
+				$query = $db->getQuery(true);
+				$selectQuery = $db->getQuery(true); // Second query object to allow any / all / exact
 
-				// get array of keywords to ignore
-				$ignoreKeywordArray = array();
-				if ($ignoreKeywords)
+				// get array of tags to ignore
+				$ignoreTagArray = array();
+				if ($ignoreTags)
 				{
-					$ignoreKeywordArray = self::cleanKeywordList($ignoreKeywords);
+					$ignoreTagArray = $ignoreTags;
 				}
 
-				if ($includeKeywords)
+				if ($includeTags)
 				{
-					self::$includeKeywordArray = self::cleanKeywordList($includeKeywords);
+					self::$includeTagArray = $includeTags;
 				}
-				$includeKeywordCount = count(self::$includeKeywordArray);
+				$includeTagCount = count(self::$includeTagArray);
 
-				// put only good keys in $keys array
-				// good = non-blank and not in ignore list
-				$keys = array();
-				foreach ($rawKeys as $key) {
-					$key = trim($key);
-					if (($key) && !(in_array(JString::strtoupper($key), $ignoreKeywordArray))) {
-						$keys[] = $key;
-					}
-				}
-				self::$mainArticleKeywords = $keys;
-				$likes = array ();
+				// Process include_tags
 
-				// create likes array for query -- only if we are not ignoring all keywords
-				// if we are ignoring all keywords, $likes is empty
-				if (!$ignoreAllKeywords) {
-					foreach ($keys as $key) {
-						$likes[] = ',' . $db->escape($key) . ','; // surround with commas so first and last items have surrounding commas
-					}
-				}
-
-				// Process include_keywords
-				foreach (self::$includeKeywordArray as $includeKeyword)
-				{
-					$likes[] = ',' . $db->escape($includeKeyword) . ',';
-				}
-
-				if ((count($likes)) || //the current article has keywords or we are matching on author
-				($matchAuthor) || // or we are matching on author
-				(($matchAuthorAlias) && ($mainArticle->created_by_alias)) || // or author alias
-				($matchCategory) || // or category
-				($includeCategories > ' ') || // or other categories
-				($includeAuthors > ' ') || // or other authors
-				($includeAliases > ' ')) // or other author aliases
+				if ((count(self::$mainArticleTags)) || //the current article has tags
+					($matchAuthor) || // or we are matching on author
+					(($matchAuthorAlias) && ($mainArticle->created_by_alias)) || // or author alias
+					($matchCategory) || // or category
+					($includeCategories > ' ') || // or other categories
+					($includeAuthors > ' ') || // or other authors
+					($includeAliases > ' ')) // or other author aliases
 				{
 					// get the ordering for the query
-					if ($showDate == 'modify') {
-						$dateSelected = 'a.modified as date, ';
+					if ($showDate == 'modify')
+					{
+						$query->select('a.modified as date');
 						$dateOrderby = 'a.modified';
-					} elseif ($showDate == 'published') {
-						$dateSelected = 'a.publish_up as date, ';
+					}
+					elseif ($showDate == 'published')
+					{
+						$query->select('a.publish_up as date');
 						$dateOrderby = 'a.publish_up';
-					} else {
-						$dateSelected = 'a.created as date, ';
+					}
+					else
+					{
+						$query->select('a.created as date');
 						$dateOrderby = 'a.created';
 					}
+
 					switch ($orderBy)
 					{
 						case 'alpha' :
-							$sqlSort = 'ORDER BY a.title';
+							$query->order('a.title');
 							break;
 
 						case 'rdate' :
-							$sqlSort = 'ORDER BY '. $dateOrderby . ' desc, a.title';
+							$query->order($dateOrderby . ' DESC, a.title ASC');
 							break;
 
 						case 'date' :
-							$sqlSort = 'ORDER BY '. $dateOrderby . ', a.title';
+							$query->order($dateOrderby . 'ASC, a.title ASC');
 							break;
 
-						case 'bestmatch' : // note that for bestmatch order, sort must be done after the sql query is run
-							$sqlSort = '';
+						case 'bestmatch' :
+							$query->order('match_count DESC');
 							break;
 
 						case 'article_order' :
-							$sqlSort = 'ORDER BY cc.lft, a.ordering, a.title' ;
+							$query->order('cc.lft ASC, a.ordering ASC, a.title ASC');
 							break;
 
 						case 'random' :
-							$sqlSort = 'ORDER BY random';
+							$query->select('rand() as random');
+							$query->order('random ASC');
 							break;
 
 						default:
-							$sqlSort = 'ORDER BY a.title';
+							$query->order('a.title ASC');
 					}
-					if ($likes) {
-						$keywordSelection = ' CONCAT(",", REPLACE(a.metakey,", ",","),",") LIKE "%'.
-						implode('%" OR CONCAT(",", REPLACE(a.metakey,", ",","),",") LIKE "%', $likes).'%"';
+
+					if (count(self::$mainArticleTags) > 0)
+					{
+						// $tagQuery is used to build subquery for getting tag information from the mapping table
+						$tagQuery = $db->getQuery(true);
+						$tagQuery->from('#__contentitem_tag_map')
+							->select('content_item_id')
+							->select('COUNT(*) AS total_tag_count')
+							->select('SUM(CASE WHEN tag_id IN (' . implode(',', self::$mainArticleTags) . ') THEN 1 ELSE 0 END) AS matching_tag_count')
+							->select('GROUP_CONCAT(CASE WHEN tag_id IN (' . implode(',', self::$mainArticleTags) . ') THEN tag_id ELSE null END) AS matching_tags')
+							->where('type_alias = \'com_content.article\'')
+							->group('content_item_id');
+						$tagQueryString = '(' . trim((string) $tagQuery) . ')';
+						$query->leftJoin($tagQueryString . ' AS m ON m.content_item_id = a.id');
+						$query->select('m.total_tag_count, m.matching_tag_count AS match_count, m.matching_tags as match_list');
+
+						switch ($anyOrAll)
+						{
+							case 'all':
+								$selectQuery->where('m.matching_tag_count = ' . $count, 'OR');
+								break;
+							case 'exact':
+								$selectQuery->where('(m.matching_tag_count = ' . $count . ' AND m.matching_tag_count = m.total_tag_count)', 'OR');
+								break;
+							default:
+								$selectQuery->where('m.matching_tag_count > 0', 'OR');
+						}
 					}
-					else { // in this case we are only going to match on author or alias or category,
-						// so we put a harmless false selection here
-						$keywordSelection = ' 1 = 2 '; // just as a placeholder (so our AND's and OR's still work)
+					else
+					{
+						$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
 					}
 
 					if ($catid > ' ' and ($mainArticle->catid > ' ')) {
 						$ids = str_replace('C', $mainArticle->catid, JString::strtoupper($catid));
 						$ids = explode( ',', $ids);
 						JArrayHelper::toInteger( $ids );
-						$catCondition = ' AND a.catid IN (' . implode(',', $ids ) . ')';
+						$query->where('a.catid IN (' . implode(',', $ids ) . ')');
 					}
 
 					if ($matchAuthor) {
-						$matchAuthorCondition = ' OR a.created_by = ' . $db->Quote($mainArticle->created_by) . ' ';
+						$selectQuery->where('a.created_by = ' . $db->quote($mainArticle->created_by), 'OR');
 					}
 
 					if (($matchAuthorAlias) && ($mainArticle->created_by_alias)) {
-						$matchAuthorAliasCondition = ' OR UPPER(a.created_by_alias) = '
-							. $db->Quote(JString::strtoupper($mainArticle->created_by_alias)) . ' ';
+						$selectQuery->where('UPPER(a.created_by_alias) = '
+							. $db->Quote(JString::strtoupper($mainArticle->created_by_alias)), 'OR');
 					}
 
 					if ($matchCategory) {
-						$matchCategoryCondition = ' OR a.catid = ' . $db->Quote($mainArticle->catid) . ' ';
+						$selectQuery->where('a.catid = ' . $db->quote($mainArticle->catid), 'OR');
 					}
 
 					if ($includeCategories > ' ') {
-						$includeCategoriesCondition = ' OR a.catid in ('. $includeCategories . ') ';
+						$selectQuery->where('a.catid in ('. $includeCategories . ')', 'OR');
 					}
+
 					if ($includeAuthors > ' ') {
-						$includeAuthorCondition = ' OR a.created_by in ('. $includeAuthors . ') ';
+						$selectQuery->where('a.created_by in ('. $includeAuthors . ')', 'OR');
 					}
+
 					if ($includeAliases > ' ') {
-						$includeAliasCondition = ' OR a.created_by_alias in ('. $includeAliases . ') ';
+						$selectQuery->where('a.created_by_alias in ('. $includeAliases . ')', 'OR');
 					}
 
 					// select other items based on the metakey field 'like' the keys found
-					$query = 'SELECT a.id, a.title, a.introtext, ' .
-					$dateSelected .
-					 		' a.catid, cc.access AS cat_access,' .
-							' a.created_by, a.created_by_alias, u.name AS author, ' .
-							' cc.published AS cat_state, ' .
-							' CASE WHEN CHAR_LENGTH(a.alias) THEN CONCAT_WS(":", a.id, a.alias) ELSE a.id END as slug,'.
-							' CASE WHEN CHAR_LENGTH(cc.alias) THEN CONCAT_WS(":", cc.id, cc.alias) ELSE cc.id END as catslug,'.
-							' cc.title as category_title, a.introtext as introtext_raw, a.fulltext, ' .
-							$random .
-					// add new columns to query for counting keyword matches
-							' a.metakey, "0" as match_count, "" as match_list ' .
-							' FROM #__content AS a' .
-							' LEFT JOIN #__content_frontpage AS f ON f.content_id = a.id' .
-							' LEFT JOIN #__categories AS cc ON cc.id = a.catid' .
-							' LEFT JOIN #__users AS u ON u.id = a.created_by' .
-							' WHERE a.id != '.(int) $id .
-							' AND a.state = 1' .
-							' AND a.access IN (' . $userGroups . ')' .
-							' AND cc.access IN (' . $userGroups . ')' .
-							' AND cc.published = 1 ' .
-							' AND ( ' .
-					$keywordSelection .
-					($matchAuthor ? $matchAuthorCondition : '' ) . // author match part of OR clause
-					($matchAuthorAlias ? $matchAuthorAliasCondition : '') . // author alias part of OR clause
-					($matchCategory ? $matchCategoryCondition : '') . // match category part of OR clause
-					(($includeCategories > ' ') ? $includeCategoriesCondition : ''). // include articles from these categories
-					(($includeAuthors > ' ') ? $includeAuthorCondition : ''). // include articles from these authors
-					(($includeAliases > ' ') ? $includeAliasCondition : ''). // include articles from these author aliases
-					' )' .
-							' AND ( a.publish_up = '.$db->Quote($nullDate).' OR a.publish_up <= '.$db->Quote($now).' )' .
-							' AND ( a.publish_down = '.$db->Quote($nullDate).' OR a.publish_down >= '.$db->Quote($now).' ) ' .
-					((($catid > ' ') && ($mainArticle->catid > ' ')) ? $catCondition : '') .  // add category selection, if any
-					$sqlSort; // sort the query
+					$query->select('a.id, a.title, a.introtext');
+					$query->select('a.catid, cc.access AS cat_access');
+					$query->select('a.created_by, a.created_by_alias, u.name AS author');
+					$query->select('cc.published AS cat_state');
+					$query->select('CASE WHEN CHAR_LENGTH(a.alias) THEN CONCAT_WS(":", a.id, a.alias) ELSE a.id END as slug');
+					$query->select('CASE WHEN CHAR_LENGTH(cc.alias) THEN CONCAT_WS(":", cc.id, cc.alias) ELSE cc.id END as catslug');
+					$query->select('cc.title as category_title, a.introtext as introtext_raw, a.fulltext');
+					// add new columns to query for counting tag matches
+					$query->select('a.metakey, "0" as match_count, "" as match_list');
+					$query->from('#__content AS a');
+					$query->leftJoin('#__content_frontpage AS f ON f.content_id = a.id');
+					$query->leftJoin('#__categories AS cc ON cc.id = a.catid');
+					$query->leftJoin('#__users AS u ON u.id = a.created_by');
+					$query->where('a.id != '.(int) $id);
+					$query->where('a.state = 1');
+					$query->where('a.access IN (' . $userGroups . ')');
+					$query->where('cc.access IN (' . $userGroups . ')');
+					$query->where('cc.published = 1');
+					$query->where('(a.publish_up = '.$db->Quote($nullDate).' OR a.publish_up <= '.$db->Quote($now).' )');
+					$query->where('(a.publish_down = '.$db->Quote($nullDate).' OR a.publish_down >= '.$db->Quote($now).')');
 
-					// if not sorting by best match or using the minimum matches
-					// we can limit the sql query to the count parameter
-					if (($orderBy != 'bestmatch') && ($minimumMatches <= 1))
-					{
-						$db->setQuery($query, 0, $showLimit);
-					}
-					else
-					{
-						$db->setQuery($query); // can't use $showLimit until we sort by bestmatch
-					}
+					// Plug in the WHERE clause of $selectQuery inside ()
+					$query->where('(' . substr((string) $selectQuery->where, 8) . ')');
+
+					$db->setQuery($query, 0, $showLimit);
 					$temp = $db->loadObjectList();
+					$related = array();
 
-					if (count($temp)) // we have at least one related article
+					if (count($temp) > 0)
 					{
-						// count the number of keyword matches (skip if not required based on parameter settings)
-						if (($showMatchList) || ($showCount) || ($orderBy == 'bestmatch') ||
-							($orderBy == 'keyword_article') || ($minimumMatches > 1))
-						{
-							foreach ($temp as $row) // loop through each related article
-							{
-								$rowkeywords = explode(',', trim($row->metakey)); // create array of current article's keyword phrases
-
-								// Don't do this if we are ignoring all keywords
-								if (!$ignoreAllKeywords)
-								{
-									foreach ($rowkeywords as $keyword) // loop through each keyword phrase of this related article
-									{
-										// Check that keyword is not in ignore list
-										if (!in_array($keyword, $ignoreKeywordArray))
-										{
-											foreach ($keys as $nextkey) // loop through each keyword phrase of the main article
-											{
-												// only test if there is at least one keyword
-												if ((trim($keyword)) && (JString::strtoupper(trim($keyword)) == JString::strtoupper(trim($nextkey)))) // test key match (ignore case)
-												{
-													$row->match_count ++; // if match, increment counter
-													$matching_keywords[] = trim($keyword); // if match, add this phrase to list of matches
-												}
-											}
-										}
-									}
-								}
-								// add author or alias to count and list, if applicable
-								if (($matchAuthorAlias) && // check parameter
-								(trim($mainArticle->created_by_alias)) && // check that there is an alias
-								(JString::strtoupper(trim($row->created_by_alias)) == JString::strtoupper(trim($mainArticle->created_by_alias)))) // check match
-								{
-									$row->match_count++;
-									$matching_keywords[] = trim($row->created_by_alias);
-								}
-								else if (($matchAuthor) && ($row->created_by == $mainArticle->created_by)) // otherwise, check authors
-								{
-									$row->match_count++;
-									$matching_keywords[] = trim($row->author);
-								}
-								if (($matchCategory) && ($mainArticle->catid == $row->catid)) {
-									$row->match_count++;
-									$matching_keywords[] = ($row->catid == 0) ? JText::_('Uncategorised') : trim($row->category_title);
-								}
-
-								if (($includeCategories > ' ')
-										&& (in_array($row->catid, explode(',', $includeCategories)))
-										&& !(($row->catid == $mainArticle->catid) && ($matchCategory))) {
-									$row->match_count++;
-									$matching_keywords[] = ($row->catid == 0) ? JText::_('Uncategorised') : trim($row->category_title);
-								}
-								if (($includeAliases)
-										&& (in_array($db->Quote($row->created_by_alias), explode(',', $includeAliases)))
-										&& !(($row->created_by_alias == $mainArticle->created_by_alias) && ($matchAuthorAlias))) {
-									$row->match_count++;
-									$matching_keywords[] = $row->created_by_alias;
-								}
-								else if (($includeAuthors)
-										&& (in_array($row->created_by, explode(',', $includeAuthors)))
-										&& !(($row->created_by == $mainArticle->created_by) && ($matchAuthor))) {
-									$row->match_count++;
-									$matching_keywords[] = $row->author;
-								}
-
-								// Process included keywords
-								if ($includeKeywordCount > 0)
-								{
-									$cleanMatchingKeys = self::cleanKeywordList(implode(',', $matching_keywords));
-									$cleanRowKeys = self::cleanKeywordList(implode(',', $rowkeywords));
-									foreach ($rowkeywords as $rowKey)
-									{
-										$cleanRowKey = JString::trim(JString::strtoupper($rowKey));
-										if (!in_array($cleanRowKey, $cleanMatchingKeys) && in_array($cleanRowKey, self::$includeKeywordArray))
-										{
-											$matching_keywords[] = $rowKey;
-											$row->match_count++;
-										}
-									}
-								}
-
-								$row->match_list = $matching_keywords; // save all of the matches for the current row
-								$matching_keywords = array(); // reset the array for the next row
-							}
-						}
-
-						if ($orderBy == 'bestmatch') // need to sort now that we have the count of keyword matches
-						{
-							usort($temp, array('self', 'reverseSort'));
-						}
-
-						$ii = 1;
 						foreach ($temp as $row)
 						{
 							if (($row->match_count >= $minimumMatches || $minimumMatches <= 1))
@@ -417,25 +330,11 @@ class modFJRelatedPlusHelper
 							}
 						}
 					}
-					unset ($temp);
 				}
 			}
 
 			return $related;
 		}
-	}
-
-	public static function reverseSort ($row1, $row2) // comp
-	{
-		if ($row1->match_count == $row2->match_count) // sort by title within match_count (if same # matches)
-		{
-			$result = strcmp ($row1->title, $row2->title);
-		}
-		else
-		{
-			$result = - strcmp ($row1->match_count, $row2->match_count); // otherwise, sort by reverse match_count
-		}
-		return $result;
 	}
 
 	/**
@@ -472,27 +371,6 @@ class modFJRelatedPlusHelper
 			$j++; // we found the next match. now increment to keep in synch with $i
 		}
 		return (substr($rawText, 0, $j)); // return up to this char
-	}
-
-	/**
-	 * Function to clean up ignore_keywords parameter to remove extra spaces
-	 * and illegal characters. Also converts to upper case to allow for
-	 * case-insensitive comparisons.
-	 * @param $rawList - one or more keywords with possible bad characters
-	 * returns array() of clean keywords
-	 *
-	 */
-	public static function cleanKeywordList($rawList) {
-		$bad_characters = array("\n", "\r", "\"", "<", ">"); // array of characters to remove
-		$after_clean = JString::str_ireplace($bad_characters, "", $rawList); // remove bad characters
-		$keys = explode(',', $after_clean); // create array using commas as delimiter
-		$clean_keys = array();
-		foreach($keys as $key) {
-			if(trim($key)) {  // ignore blank keywords
-				$clean_keys[] = JString::strtoupper( trim($key) );
-			}
-		}
-		return $clean_keys; // return array of clean, upper-case keyword phrases
 	}
 
 	/**
