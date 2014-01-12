@@ -17,10 +17,9 @@ class modFJRelatedPlusHelper
 	 * The tags from the Main Article
 	 *
 	 * @access public
-	 * @var array
+	 * @var array  Associative array $tagId => $tagTitle
 	 */
 	static $mainArticleTags = array();
-	static $mainArticleTagNames = array();
 	static $mainArticleAlias = null;
 	static $mainArticleAuthor = null;
 	static $mainArticleCategory = null;
@@ -106,8 +105,7 @@ class modFJRelatedPlusHelper
 				$tagObjects = $db->loadObjectList();
 				foreach ($tagObjects as $tagObject)
 				{
-					self::$mainArticleTags[] = $tagObject->id;
-					self::$mainArticleTagNames[] = $tagObject->title;
+					self::$mainArticleTags[$tagObject->id] = $tagObject->title;
 				}
 
 
@@ -215,8 +213,8 @@ class modFJRelatedPlusHelper
 						$tagQuery->from('#__contentitem_tag_map')
 							->select('content_item_id')
 							->select('COUNT(*) AS total_tag_count')
-							->select('SUM(CASE WHEN tag_id IN (' . implode(',', self::$mainArticleTags) . ') THEN 1 ELSE 0 END) AS matching_tag_count')
-							->select('GROUP_CONCAT(CASE WHEN tag_id IN (' . implode(',', self::$mainArticleTags) . ') THEN tag_id ELSE null END) AS matching_tags')
+							->select('SUM(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN 1 ELSE 0 END) AS matching_tag_count')
+							->select('GROUP_CONCAT(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN tag_id ELSE null END) AS matching_tags')
 							->where('type_alias = \'com_content.article\'')
 							->group('content_item_id');
 						$tagQueryString = '(' . trim((string) $tagQuery) . ')';
@@ -280,8 +278,7 @@ class modFJRelatedPlusHelper
 					$query->select('CASE WHEN CHAR_LENGTH(a.alias) THEN CONCAT_WS(":", a.id, a.alias) ELSE a.id END as slug');
 					$query->select('CASE WHEN CHAR_LENGTH(cc.alias) THEN CONCAT_WS(":", cc.id, cc.alias) ELSE cc.id END as catslug');
 					$query->select('cc.title as category_title, a.introtext as introtext_raw, a.fulltext');
-					// add new columns to query for counting tag matches
-					$query->select('a.metakey, "0" as match_count, "" as match_list');
+					$query->select('a.metakey');
 					$query->from('#__content AS a');
 					$query->leftJoin('#__content_frontpage AS f ON f.content_id = a.id');
 					$query->leftJoin('#__categories AS cc ON cc.id = a.catid');
@@ -305,29 +302,36 @@ class modFJRelatedPlusHelper
 					{
 						foreach ($temp as $row)
 						{
-							if (($row->match_count >= $minimumMatches || $minimumMatches <= 1))
+							$row->route = JRoute::_(ContentHelperRoute::getArticleRoute($row->slug, $row->catslug));
+							// add processing for intro text tooltip
+							if ($showTooltip)
 							{
-								$row->route = JRoute::_(ContentHelperRoute::getArticleRoute($row->slug, $row->catslug));
-								// add processing for intro text tooltip
-								if ($showTooltip) {
-									// limit introtext to length if parameter set & it is needed
-									$strippedText = strip_tags($row->introtext);
-									$row->introtext = self::fixSefImages($row->introtext);
-									if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit)) {
-										$row->introtext =
-										htmlspecialchars(
-										self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
-									}
-									else {
-										$row->introtext = htmlspecialchars($row->introtext);
-									}
+								// limit introtext to length if parameter set & it is needed
+								$strippedText = strip_tags($row->introtext);
+								$row->introtext = self::fixSefImages($row->introtext);
+								if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit))
+								{
+									$row->introtext = htmlspecialchars(self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
 								}
-								$related[] = $row;
-
-								// need to check this in case we are using bestmatch sort or minimum matches
-								// Increment only if we added this to the array
-								if ($ii++ >= $showLimit) { break; }
+								else
+								{
+									$row->introtext = htmlspecialchars($row->introtext);
+								}
 							}
+
+							// Get list of matching tags
+							if ($showMatchList && $row->match_count)
+							{
+								$tagNameArray = array();
+								$tagArray = explode(',', $row->match_list);
+								foreach ($tagArray as $tagId)
+								{
+									$tagNameArray[] = self::$mainArticleTags[$tagId];
+								}
+								$row->match_list = $tagNameArray;
+							}
+							$related[] = $row;
+
 						}
 					}
 				}
