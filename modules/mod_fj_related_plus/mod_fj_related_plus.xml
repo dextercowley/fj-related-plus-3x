@@ -30,7 +30,7 @@
 		<fields name="params">
 			<fieldset name="layout" >
 				<field name="count" type="text" default="5" label="Count" description="PARAMARTICLECOUNT" />
-				<field name="minimumMatches" type="text" default="1" label="Minimum_Matches" description="PARAMFJMINIMUMMATCHES" />		
+				<field name="minimumMatches" type="text" default="1" filter="integer" label="Minimum_Matches" description="PARAMFJMINIMUMMATCHES" />		
   				<field type="spacer" hr="true" />
  				<field name="ordering" type="list" default="alpha" label="Ordering" description="PARAMORDERING">
 					<option value="alpha">Title_Alphabetical</option>

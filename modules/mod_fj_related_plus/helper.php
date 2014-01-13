@@ -38,6 +38,7 @@ class modFJRelatedPlusHelper
 			$showDate = $params->get('showDate', 'none');
 			$showLimit = intval($params->get('count', 5));
 			$minimumMatches = intval($params->get('minimumMatches', 1));
+			$minimumMatches = ($minimumMatches > 0) ? $minimumMatches : 1;
 			$showCount = $params->get('showMatchCount', 0);
 			$showMatchList = $params->get('showMatchList', 0);
 			$orderBy = $params->get('ordering', 'alpha');
@@ -186,7 +187,7 @@ class modFJRelatedPlusHelper
 							break;
 
 						case 'date' :
-							$query->order($dateOrderby . 'ASC, a.title ASC');
+							$query->order($dateOrderby . ' ASC, a.title ASC');
 							break;
 
 						case 'bestmatch' :
@@ -230,7 +231,7 @@ class modFJRelatedPlusHelper
 								$selectQuery->where('(m.matching_tag_count = ' . $count . ' AND m.matching_tag_count = m.total_tag_count)', 'OR');
 								break;
 							default:
-								$selectQuery->where('m.matching_tag_count > 0', 'OR');
+								$selectQuery->where('m.matching_tag_count >= ' . $minimumMatches, 'OR');
 						}
 					}
 					else
