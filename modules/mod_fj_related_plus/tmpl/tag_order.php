@@ -13,68 +13,53 @@ $showCount 			= $params->def('showMatchCount', 0);
 $matchAuthor 		= $params->def('matchAuthor', 0);
 $matchAuthorAlias 	= $params->def('matchAuthorAlias', 0);
 $matchCategory 		= $params->def('fjmatchCategory');
-$mainKeys 			= modFJRelatedPlusHelper::$mainArticleKeywords; // get keyword array for main article
+$mainArticleTags 	= modFJRelatedPlusHelper::$mainArticleTags; // get tag array for main article
 $mainArticleAlias 	= modFJRelatedPlusHelper::$mainArticleAlias; // alias value for main article
 $mainArticleAuthor 	= modFJRelatedPlusHelper::$mainArticleAuthor; // author id of main article
 $mainArticleCategory = modFJRelatedPlusHelper::$mainArticleCategory; // category id of main article
-$keywordLabel 		= $params->def('keywordLabel', '');
+$tagLabel 			= $params->def('tagLabel', '');
 $dateFormat 		= $params->def('date_format', JText::_('DATE_FORMAT_LC4'));
 $showTooltip 		= $params->get('show_tooltip', '1');
 $titleLinkable 		= $params->get('fj_title_linkable');
-$includeKeysClean	= modFJRelatedPlusHelper::$includeKeywordArray;
-$includeKeysRaw 		= array();
-if ($keyWordString = $params->get('include_keywords'))
-{
-	$includeKeysRaw = explode(',', $keyWordString);
-}
 
-$thisWord 			= '';
-
-$outputArray = array(array());
+$outputArray = array();
 
 foreach ($list as $item) // loop through articles
 {
-	foreach ($item->match_list as $matchWord) // loop through match list for the article
+	foreach ($item->match_list as $matchTag) // loop through match list for the article
 	{
-		foreach ($mainKeys as $nextKey) // loop through the key words for the main aritcle
+		foreach ($mainArticleTags as $nextId => $nextTag) // loop through the key words for the main aritcle
 		{
 			// find main article match. this eliminates duplcates based on upper and lower case
-			if (trim(JString::strtoupper($nextKey)) == JString::strtoupper($matchWord))
+			if (trim(JString::strtoupper($nextTag)) == JString::strtoupper($matchTag))
 			{
-				$thisWord = trim($nextKey);
+				$thisTag = $nextTag;
 			}
 		}
 
-		foreach ($includeKeysRaw as $nextIncludeKey)
-		{
-			if (trim(JString::strtoupper($nextIncludeKey)) == JString::strtoupper($matchWord))
-			{
-				$thisWord = trim($nextIncludeKey);
-			}
-		}
 		if (($matchAuthorAlias) && ($mainArticleAlias)
 				&& (JString::strtoupper($mainArticleAlias) == JString::strtoupper($matchWord))) {
-			$thisWord = $mainArticleAlias;
+			$thisTag = $mainArticleAlias;
 		}
 		else if (($matchAuthor) && ($mainArticleAuthor == $matchWord)) {
-			$thisWord = $item->author;
+			$thisTag = $item->author;
 		}
 		if (($matchCategory) && ($mainArticleCategory == $matchWord)) {
-			$thisWord = $item->category_title;
+			$thisTag = $item->category_title;
 		}
 
-		$outputArray[$thisWord][] = $item;
-		$thisWord = '';
+		$outputArray[$thisTag][] = $item;
+		$thisTag = '';
 	}
 }
 
 ksort($outputArray, SORT_STRING | SORT_FLAG_CASE);  // sort keywords alphabetically ?>
 
 <ul class="relateditems<?php echo $params->get('moduleclass_sfx'); ?>">
-<?php foreach ($outputArray as $thisKeyword => $articleList) : ?>
-	<?php if ($thisKeyword)  : ?>
+<?php foreach ($outputArray as $thisTag => $articleList) : ?>
+	<?php if ($thisTag)  : ?>
 		<li><strong>
-		<?php echo (($keywordLabel) ? $keywordLabel . ' ' : '') . $thisKeyword; ?>
+		<?php echo (($tagLabel) ? $tagLabel . ' ' : '') . $thisTag; ?>
 		</strong>
 		<ul>
 		<?php foreach ($articleList as $thisArticle) : ?>

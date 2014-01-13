@@ -34,10 +34,10 @@ if (!count($list)) {  // no articles to list. check whether we want to show some
 }
 
 // choose layout based on ordering parameter
-if ($params->get('ordering') == 'keyword_article' && count($list))
+if ($params->get('ordering') == 'tag_article' && count($list))
 {
 	// We need to hard-code the layout when sorting by keyword_article
-	$path = JModuleHelper::getLayoutPath('mod_fj_related_plus', 'key_word');
+	$path = JModuleHelper::getLayoutPath('mod_fj_related_plus', 'tag_order');
 }
 else
 {
