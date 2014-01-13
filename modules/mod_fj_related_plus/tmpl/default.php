@@ -77,8 +77,8 @@ $titleLinkable = $params->get('fj_title_linkable'); ?>
 			<ul>
 			<?php $temp_list = $item->match_list;
 				natcasesort($temp_list);
-				foreach ($temp_list as $this_keyword) : ?>
-					<li> <?php echo $this_keyword; ?></li>
+				foreach ($temp_list as $this_tag) : ?>
+					<li> <?php echo $this_tag; ?></li>
 				<?php endforeach; ?>
 			</ul>
 		<?php endif; ?>

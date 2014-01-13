@@ -48,11 +48,11 @@
 					<option value="published">PUBLISHED_DATE</option>
 				</field>
 				<field name="date_format" type="text" size="30" default="" label="Date_Format" description="PARAMDATEFORMAT" />
-				<field name="showMatchCount" type="radio" default="0" label="Keyword_Match_Count" description="PARAMKEYWORDCOUNT">
+				<field name="showMatchCount" type="radio" default="0" label="FJ_RELATED_PLUS_TAG_COUNT_LABEL" description="FJ_RELATED_PLUS_TAG_COUNT_DESC">
 					<option value="0">JHIDE</option>
 					<option value="1">JSHOW</option>
 				</field>
-				<field name="showMatchList" type="radio" default="0" label="Keyword_Match_List" description="PARAMKEYWORDLIST">
+				<field name="showMatchList" type="radio" default="0" label="FJ_RELATED_PLUS_MATCH_LIST_LABEL" description="FJ_RELATED_PLUS_MATCH_LIST_DESC">
 					<option value="0">JHIDE</option>
 					<option value="1">JSHOW</option>
 				</field>

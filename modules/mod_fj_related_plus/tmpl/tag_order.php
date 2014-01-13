@@ -53,7 +53,7 @@ foreach ($list as $item) // loop through articles
 	}
 }
 
-ksort($outputArray, SORT_STRING | SORT_FLAG_CASE);  // sort keywords alphabetically ?>
+ksort($outputArray, SORT_STRING | SORT_FLAG_CASE);  // sort tags alphabetically ?>
 
 <ul class="relateditems<?php echo $params->get('moduleclass_sfx'); ?>">
 <?php foreach ($outputArray as $thisTag => $articleList) : ?>
