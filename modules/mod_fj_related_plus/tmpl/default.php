@@ -75,7 +75,7 @@ $titleLinkable = $params->get('fj_title_linkable'); ?>
 
 		<?php if($showMatchList) : ?>
 			<ul>
-			<?php $temp_list = $item->match_list;
+			<?php $temp_list = isset($item->match_list) ? $item->match_list : array();
 				natcasesort($temp_list);
 				foreach ($temp_list as $this_tag) : ?>
 					<li> <?php echo $this_tag; ?></li>
