@@ -20,13 +20,13 @@ class modFJRelatedPlusHelper
 	 * @var array  Associative array $tagId => $tagTitle
 	 */
 	static $mainArticleTags = array();
-	static $mainArticleAlias = null;
-	static $mainArticleAuthor = null;
-	static $mainArticleCategory = null;
+	static $mainArticle = null;
 	static $includeTagArray = array();
+	static $params = null;
 
 	public static function getList($params)
 	{
+		self::$params = $params;
 		$includeMenuTypes = $params->get('fj_menu_item_types', 'article');
 		// only do this if this is an article or if we are showing this module for any menu item type
 		if (self::isArticle() || ($includeMenuTypes == 'any')) //only show for article pages
@@ -35,13 +35,8 @@ class modFJRelatedPlusHelper
 			$user = JFactory::getUser();
 			$userGroups = implode(',', $user->getAuthorisedViewLevels());
 
-			$showDate = $params->get('showDate', 'none');
-			$showLimit = intval($params->get('count', 5));
 			$minimumMatches = intval($params->get('minimumMatches', 1));
 			$minimumMatches = ($minimumMatches > 0) ? $minimumMatches : 1;
-			$showCount = $params->get('showMatchCount', 0);
-			$showMatchList = $params->get('showMatchList', 0);
-			$orderBy = $params->get('ordering', 'alpha');
 
 			// process categories either as comma-delimited list or as array
 			// (for backward compatibility)
@@ -82,34 +77,9 @@ class modFJRelatedPlusHelper
 			$metakey = '';
 			$id = JFactory::getApplication()->input->getInt('id');
 
-			if (self::isArticle()) {
-				// select the author info from the item
-				$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
-					' cc.title as category_title, u.name as author ' .
-					' FROM #__content AS a' .
-					' LEFT JOIN #__categories AS cc ON cc.id = a.catid' .
-					' LEFT JOIN #__users AS u ON u.id = a.created_by' .
-					' WHERE a.id = '.(int) $id;
-				$db->setQuery($query);
-				$mainArticle = $db->loadObject();
-
-				// Get tags for this article.
-				// Load the tags from the mapping table
-				$query = $db->getQuery(true);
-				$query->select('t.id, t.title')
-					->from('#__tags AS t')
-					->innerJoin('#__contentitem_tag_map AS m ON t.id = m.tag_id')
-					->where("m.type_alias = 'com_content.article'")
-					->where('content_item_id = ' . $id)
-					->order('t.title ASC');
-				$db->setQuery($query);
-				$tagObjects = $db->loadObjectList();
-				foreach ($tagObjects as $tagObject)
-				{
-					self::$mainArticleTags[$tagObject->id] = $tagObject->title;
-				}
-
-
+			if (self::isArticle())
+			{
+				self::selectArticle($id);
 			}
 			else
 			{
@@ -117,16 +87,24 @@ class modFJRelatedPlusHelper
 				$articleArray = array('created_by_alias' =>'', 'author' =>'',
 					'category_title' => '', 'metakey' => '', 'catid' => '',
 					'created_by' => '');
-				$mainArticle = JArrayHelper::toObject($articleArray);
+				self::$mainArticle = JArrayHelper::toObject($articleArray);
 			}
-			self::$mainArticleAlias = $mainArticle->created_by_alias;
-			self::$mainArticleAuthor = $mainArticle->author;
-			self::$mainArticleCategory = $mainArticle->category_title;
+
+			if (self::$params->get('include_tags'))
+			{
+				self::$includeTagArray = self::$params->get('include_tags');
+				$includedTagsArray = self::getTagTitles(self::$includeTagArray);
+				self::$mainArticleTags = self::$mainArticleTags + $includedTagsArray;
+			}
+			$includeTagCount = count(self::$includeTagArray);
+
+			// If we have tags to exclude, we need to remove them from main article
+
 
 			if ((count(self::$mainArticleTags) > 0) || 	// do the query if there are tags
 				($matchAuthor) || // or if the author match is on
 				// or if the alias match is on and an alias
-				(($matchAuthorAlias) && ($mainArticle->created_by_alias)) ||
+				(($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) ||
 				($matchCategory) ||	// or if the match category parameter is yes
 				($includeCategories > ' ') || // or other categories
 				($includeAuthors > ' ') || // or other authors
@@ -141,31 +119,24 @@ class modFJRelatedPlusHelper
 				if ($ignoreTags)
 				{
 					$ignoreTagArray = $ignoreTags;
+					JArrayHelper::toInteger($ignoreTagArray);
 				}
-
-				if ($includeTags)
-				{
-					self::$includeTagArray = $includeTags;
-				}
-				$includeTagCount = count(self::$includeTagArray);
-
-				// Process include_tags
 
 				if ((count(self::$mainArticleTags)) || //the current article has tags
 					($matchAuthor) || // or we are matching on author
-					(($matchAuthorAlias) && ($mainArticle->created_by_alias)) || // or author alias
+					(($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) || // or author alias
 					($matchCategory) || // or category
 					($includeCategories > ' ') || // or other categories
 					($includeAuthors > ' ') || // or other authors
 					($includeAliases > ' ')) // or other author aliases
 				{
 					// get the ordering for the query
-					if ($showDate == 'modify')
+					if ($params->get('showDate', 'none') == 'modify')
 					{
 						$query->select('a.modified as date');
 						$dateOrderby = 'a.modified';
 					}
-					elseif ($showDate == 'published')
+					elseif ($params->get('showDate', 'none') == 'published')
 					{
 						$query->select('a.publish_up as date');
 						$dateOrderby = 'a.publish_up';
@@ -176,7 +147,7 @@ class modFJRelatedPlusHelper
 						$dateOrderby = 'a.created';
 					}
 
-					switch ($orderBy)
+					switch ($params->get('ordering', 'alpha'))
 					{
 						case 'alpha' :
 							$query->order('a.title');
@@ -207,6 +178,7 @@ class modFJRelatedPlusHelper
 							$query->order('a.title ASC');
 					}
 
+					// TODO: make sure this excludes tags to ignore and includes additional tags at this point
 					if (count(self::$mainArticleTags) > 0)
 					{
 						// $tagQuery is used to build subquery for getting tag information from the mapping table
@@ -239,37 +211,47 @@ class modFJRelatedPlusHelper
 						$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
 					}
 
-					if ($catid > ' ' and ($mainArticle->catid > ' ')) {
-						$ids = str_replace('C', $mainArticle->catid, JString::strtoupper($catid));
+					if ($catid > ' ' and (self::$mainArticle->catid > ' ')) {
+						$ids = str_replace('C', self::$mainArticle->catid, JString::strtoupper($catid));
 						$ids = explode( ',', $ids);
 						JArrayHelper::toInteger( $ids );
 						$query->where('a.catid IN (' . implode(',', $ids ) . ')');
 					}
 
-					if ($matchAuthor) {
-						$selectQuery->where('a.created_by = ' . $db->quote($mainArticle->created_by), 'OR');
+					if ($matchAuthor)
+					{
+						$selectQuery->where('a.created_by = ' . $db->quote(self::$mainArticle->created_by), 'OR');
+						$authorTotalMatch = '(CASE WHEN a.created_by = ' . self::$mainArticle->author . ' THEN 1 ELSE 0 END)';
 					}
 
-					if (($matchAuthorAlias) && ($mainArticle->created_by_alias)) {
+					if (($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) {
 						$selectQuery->where('UPPER(a.created_by_alias) = '
-							. $db->Quote(JString::strtoupper($mainArticle->created_by_alias)), 'OR');
+							. $db->Quote(JString::strtoupper(self::$mainArticle->created_by_alias)), 'OR');
+						$authorAliasTotalMatch = '(CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
 					}
 
 					if ($matchCategory) {
-						$selectQuery->where('a.catid = ' . $db->quote($mainArticle->catid), 'OR');
+						$selectQuery->where('a.catid = ' . $db->quote(self::$mainArticle->catid), 'OR');
+						$currentCategoryMatch = '(CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
 					}
 
 					if ($includeCategories > ' ') {
 						$selectQuery->where('a.catid in ('. $includeCategories . ')', 'OR');
+						$otherCategoryMatch = '(CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
 					}
 
 					if ($includeAuthors > ' ') {
-						$selectQuery->where('a.created_by in ('. $includeAuthors . ')', 'OR');
+						$selectQuery->where('a.created_by IN ('. $includeAuthors . ')', 'OR');
+						$otherAuthorMatch = '(CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
 					}
 
 					if ($includeAliases > ' ') {
 						$selectQuery->where('a.created_by_alias in ('. $includeAliases . ')', 'OR');
+						$otherAuthorAliasMatch = '(CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
 					}
+
+					// Calculate total_matches including authors, author aliases, current category, and other categories
+
 
 					// select other items based on the metakey field 'like' the keys found
 					$query->select('a.id, a.title, a.introtext');
@@ -295,7 +277,7 @@ class modFJRelatedPlusHelper
 					// Plug in the WHERE clause of $selectQuery inside ()
 					$query->where('(' . substr((string) $selectQuery->where, 8) . ')');
 
-					$db->setQuery($query, 0, $showLimit);
+					$db->setQuery($query, 0, intval($params->get('count', 5)));
 					$temp = $db->loadObjectList();
 					$related = array();
 
@@ -321,7 +303,7 @@ class modFJRelatedPlusHelper
 							}
 
 							// Get list of matching tags
-							if ($showMatchList && $row->match_count)
+							if ($params->get('showMatchList', 0) && $row->match_count)
 							{
 								$tagNameArray = array();
 								$tagArray = explode(',', $row->match_list);
@@ -379,6 +361,31 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
+	 * Function to get tag title from an array of tag ids
+	 *
+	 * @param  array  $tagArray  array of tag ids
+	 *
+	 * @return  array  associative array: tag id => tag title
+	 */
+	protected static function getTagTitles($includeTags)
+	{
+		JArrayHelper::toInteger($includeTags);
+		$db = JFactory::getDbo();
+		$query = $db->getQuery(true);
+		$query->select('t.id, t.title')
+			->from('#__tags AS t')
+			->where('t.id IN (' . implode(',', $includeTags) . ')');
+		$db->setQuery($query);
+		$objectArray = $db->loadObjectList();
+		$return = array();
+		foreach ($objectArray as $object)
+		{
+			$return[$object->id] = $object->title;
+		}
+		return $return;
+	}
+
+	/**
 	 * Function to test whether we are in an article view.
 	 *
 	 * returns boolean True if current view is an article
@@ -416,6 +423,40 @@ class modFJRelatedPlusHelper
 			$string = JFactory::getDBO()->quote($string);
 		}
 		return $string;
+	}
+
+	protected static function selectArticle($id)
+	{
+		$db	= JFactory::getDBO();
+		// select the author info from the item
+		$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
+			' cc.title as category_title, u.name as author ' .
+			' FROM #__content AS a' .
+			' LEFT JOIN #__categories AS cc ON cc.id = a.catid' .
+			' LEFT JOIN #__users AS u ON u.id = a.created_by' .
+			' WHERE a.id = '.(int) $id;
+		$db->setQuery($query);
+		self::$mainArticle = $db->loadObject();
+
+		// If ignoring all tags, we don't need to get the tags for the article
+		if (!self::$params->get('ignore_all_tags', 0))
+		{
+			// Get tags for this article.
+			// Load the tags from the mapping table
+			$query = $db->getQuery(true);
+			$query->select('t.id, t.title')
+			->from('#__tags AS t')
+			->innerJoin('#__contentitem_tag_map AS m ON t.id = m.tag_id')
+			->where("m.type_alias = 'com_content.article'")
+			->where('content_item_id = ' . $id)
+			->order('t.title ASC');
+			$db->setQuery($query);
+			$tagObjects = $db->loadObjectList();
+			foreach ($tagObjects as $tagObject)
+			{
+				self::$mainArticleTags[$tagObject->id] = $tagObject->title;
+			}
+		}
 	}
 
 }

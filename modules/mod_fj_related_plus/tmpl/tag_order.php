@@ -14,9 +14,9 @@ $matchAuthor 		= $params->def('matchAuthor', 0);
 $matchAuthorAlias 	= $params->def('matchAuthorAlias', 0);
 $matchCategory 		= $params->def('fjmatchCategory');
 $mainArticleTags 	= modFJRelatedPlusHelper::$mainArticleTags; // get tag array for main article
-$mainArticleAlias 	= modFJRelatedPlusHelper::$mainArticleAlias; // alias value for main article
-$mainArticleAuthor 	= modFJRelatedPlusHelper::$mainArticleAuthor; // author id of main article
-$mainArticleCategory = modFJRelatedPlusHelper::$mainArticleCategory; // category id of main article
+$mainArticleAlias 	= modFJRelatedPlusHelper::$mainArticle->created_by_alias; // alias value for main article
+$mainArticleAuthor 	= modFJRelatedPlusHelper::$mainArticle->author; // author id of main article
+$mainArticleCategory = modFJRelatedPlusHelper::$mainArticle->catid; // category id of main article
 $tagLabel 			= $params->def('tagLabel', '');
 $dateFormat 		= $params->def('date_format', JText::_('DATE_FORMAT_LC4'));
 $showTooltip 		= $params->get('show_tooltip', '1');
@@ -38,13 +38,13 @@ foreach ($list as $item) // loop through articles
 		}
 
 		if (($matchAuthorAlias) && ($mainArticleAlias)
-				&& (JString::strtoupper($mainArticleAlias) == JString::strtoupper($matchWord))) {
+				&& (JString::strtoupper($mainArticleAlias) == JString::strtoupper($matchTag))) {
 			$thisTag = $mainArticleAlias;
 		}
-		else if (($matchAuthor) && ($mainArticleAuthor == $matchWord)) {
+		else if (($matchAuthor) && ($mainArticleAuthor == $matchTag)) {
 			$thisTag = $item->author;
 		}
-		if (($matchCategory) && ($mainArticleCategory == $matchWord)) {
+		if (($matchCategory) && ($mainArticleCategory == $matchTag)) {
 			$thisTag = $item->category_title;
 		}
 
