@@ -31,52 +31,30 @@ class modFJRelatedPlusHelper
 		// only do this if this is an article or if we are showing this module for any menu item type
 		if (self::isArticle() || ($includeMenuTypes == 'any')) //only show for article pages
 		{
-			$db	= JFactory::getDBO();
-			$user = JFactory::getUser();
-			$userGroups = implode(',', $user->getAuthorisedViewLevels());
-
-			$minimumMatches = intval($params->get('minimumMatches', 1));
-			$minimumMatches = ($minimumMatches > 0) ? $minimumMatches : 1;
-
 			// process categories either as comma-delimited list or as array
 			// (for backward compatibility)
 			$catid = (is_array($params->get('catid'))) ?
 				implode(',', $params->get('catid') ) : trim($params->get('catid'));
 
 			$matchAuthor = trim($params->get('matchAuthor', 0));
-			$matchAuthorCondition = '';
 			$matchAuthorAlias = trim($params->get('matchAuthorAlias', 0));
-			$matchAuthorAliasCondition = '';
 			$matchCategory = $params->get('fjmatchCategory');
-			$matchCategoryCondition = '';
-			$anyOrAll = $params->get('anyOrAll', 'any');
-
-			$showTooltip = $params->get('show_tooltip', 1);
-			$tooltipLimit = (int) $params->get('max_chars', 250);
-
-			$ignoreTags = $params->get('ignore_tags', '');
-			$ignoreAllTags = $params->get('ignore_all_tags', 0);
 			$includeTags = $params->get('include_tags');
 
 			$includeCategories = (is_array($params->get('fj_include_categories')))
 				? implode(',', $params->get('fj_include_categories')) : $params->get('fj_include_categories');
+
 			$includeAuthors	= (is_array($params->get('fj_include_authors')))
 				? implode(',', $params->get('fj_include_authors')) : $params->get('fj_include_authors');
-			// put quotes around
+
 			$includeAliases	= (is_array($params->get('fj_include_alias')))
 				? implode(',', array_map(array('self', 'dbQuote'), $params->get('fj_include_alias')))
 				: self::dbQuote($params->get('fj_include_alias'));
 
-			$nullDate = $db->getNullDate();
-
-			$date = JFactory::getDate();
-			$now  = $date->toSQL();
-
 			$related = array();
 			$matching_tags = array();
-			$metakey = '';
-			$id = JFactory::getApplication()->input->getInt('id');
 
+			$id = JFactory::getApplication()->input->getInt('id');
 			if (self::isArticle())
 			{
 				self::selectArticle($id);
@@ -96,10 +74,16 @@ class modFJRelatedPlusHelper
 				$includedTagsArray = self::getTagTitles(self::$includeTagArray);
 				self::$mainArticleTags = self::$mainArticleTags + $includedTagsArray;
 			}
-			$includeTagCount = count(self::$includeTagArray);
 
 			// If we have tags to exclude, we need to remove them from main article
-
+			// get array of tags to ignore
+			if ($params->get('ignore_tags', ''))
+			{
+				$ignoreTagIds = $params->get('ignore_tags', '');
+				JArrayHelper::toInteger($ignoreTagIds);
+				$ignoredTagsArray = self::getTagTitles($ignoreTagIds);
+				self::$mainArticleTags = array_diff_assoc(self::$mainArticleTags, $ignoredTagsArray);
+			}
 
 			if ((count(self::$mainArticleTags) > 0) || 	// do the query if there are tags
 				($matchAuthor) || // or if the author match is on
@@ -111,213 +95,107 @@ class modFJRelatedPlusHelper
 				($includeAliases > ' ') || // or other author aliases
 				($includeTags)) // or include tags
 			{
-				$query = $db->getQuery(true);
-				$selectQuery = $db->getQuery(true); // Second query object to allow any / all / exact
+				$db	= JFactory::getDBO();
 
-				// get array of tags to ignore
-				$ignoreTagArray = array();
-				if ($ignoreTags)
+
+				$query = self::setDateOrderBy(self::$params);
+
+				// TODO: make sure this excludes tags to ignore and includes additional tags at this point
+				if (count(self::$mainArticleTags) > 0)
 				{
-					$ignoreTagArray = $ignoreTags;
-					JArrayHelper::toInteger($ignoreTagArray);
+					// $tagQuery is used to build subquery for getting tag information from the mapping table
+					$tagQueryString = self::getTagQueryString();
+					$query->leftJoin($tagQueryString . ' AS m ON m.content_item_id = a.id');
+					$query->select('m.total_tag_count, m.matching_tag_count AS match_count, m.matching_tags as match_list');
+
+					// Second query object to allow any / all / exact
+					$selectQuery = self::getSelectQuery($params);
+				}
+				else
+				{
+					$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
 				}
 
-				if ((count(self::$mainArticleTags)) || //the current article has tags
-					($matchAuthor) || // or we are matching on author
-					(($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) || // or author alias
-					($matchCategory) || // or category
-					($includeCategories > ' ') || // or other categories
-					($includeAuthors > ' ') || // or other authors
-					($includeAliases > ' ')) // or other author aliases
+				if ($catid > ' ' and (self::$mainArticle->catid > ' '))
 				{
-					// get the ordering for the query
-					if ($params->get('showDate', 'none') == 'modify')
-					{
-						$query->select('a.modified as date');
-						$dateOrderby = 'a.modified';
-					}
-					elseif ($params->get('showDate', 'none') == 'published')
-					{
-						$query->select('a.publish_up as date');
-						$dateOrderby = 'a.publish_up';
-					}
-					else
-					{
-						$query->select('a.created as date');
-						$dateOrderby = 'a.created';
-					}
-
-					switch ($params->get('ordering', 'alpha'))
-					{
-						case 'alpha' :
-							$query->order('a.title');
-							break;
-
-						case 'rdate' :
-							$query->order($dateOrderby . ' DESC, a.title ASC');
-							break;
-
-						case 'date' :
-							$query->order($dateOrderby . ' ASC, a.title ASC');
-							break;
-
-						case 'bestmatch' :
-							$query->order('match_count DESC');
-							break;
-
-						case 'article_order' :
-							$query->order('cc.lft ASC, a.ordering ASC, a.title ASC');
-							break;
-
-						case 'random' :
-							$query->select('rand() as random');
-							$query->order('random ASC');
-							break;
-
-						default:
-							$query->order('a.title ASC');
-					}
-
-					// TODO: make sure this excludes tags to ignore and includes additional tags at this point
-					if (count(self::$mainArticleTags) > 0)
-					{
-						// $tagQuery is used to build subquery for getting tag information from the mapping table
-						$tagQuery = $db->getQuery(true);
-						$tagQuery->from('#__contentitem_tag_map')
-							->select('content_item_id')
-							->select('COUNT(*) AS total_tag_count')
-							->select('SUM(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN 1 ELSE 0 END) AS matching_tag_count')
-							->select('GROUP_CONCAT(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN tag_id ELSE null END) AS matching_tags')
-							->where('type_alias = \'com_content.article\'')
-							->group('content_item_id');
-						$tagQueryString = '(' . trim((string) $tagQuery) . ')';
-						$query->leftJoin($tagQueryString . ' AS m ON m.content_item_id = a.id');
-						$query->select('m.total_tag_count, m.matching_tag_count AS match_count, m.matching_tags as match_list');
-
-						switch ($anyOrAll)
-						{
-							case 'all':
-								$selectQuery->where('m.matching_tag_count = ' . $count, 'OR');
-								break;
-							case 'exact':
-								$selectQuery->where('(m.matching_tag_count = ' . $count . ' AND m.matching_tag_count = m.total_tag_count)', 'OR');
-								break;
-							default:
-								$selectQuery->where('m.matching_tag_count >= ' . $minimumMatches, 'OR');
-						}
-					}
-					else
-					{
-						$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
-					}
-
-					if ($catid > ' ' and (self::$mainArticle->catid > ' ')) {
-						$ids = str_replace('C', self::$mainArticle->catid, JString::strtoupper($catid));
-						$ids = explode( ',', $ids);
-						JArrayHelper::toInteger( $ids );
-						$query->where('a.catid IN (' . implode(',', $ids ) . ')');
-					}
-
-					if ($matchAuthor)
-					{
-						$selectQuery->where('a.created_by = ' . $db->quote(self::$mainArticle->created_by), 'OR');
-						$authorTotalMatch = '(CASE WHEN a.created_by = ' . self::$mainArticle->author . ' THEN 1 ELSE 0 END)';
-					}
-
-					if (($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) {
-						$selectQuery->where('UPPER(a.created_by_alias) = '
-							. $db->Quote(JString::strtoupper(self::$mainArticle->created_by_alias)), 'OR');
-						$authorAliasTotalMatch = '(CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
-					}
-
-					if ($matchCategory) {
-						$selectQuery->where('a.catid = ' . $db->quote(self::$mainArticle->catid), 'OR');
-						$currentCategoryMatch = '(CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
-					}
-
-					if ($includeCategories > ' ') {
-						$selectQuery->where('a.catid in ('. $includeCategories . ')', 'OR');
-						$otherCategoryMatch = '(CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
-					}
-
-					if ($includeAuthors > ' ') {
-						$selectQuery->where('a.created_by IN ('. $includeAuthors . ')', 'OR');
-						$otherAuthorMatch = '(CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
-					}
-
-					if ($includeAliases > ' ') {
-						$selectQuery->where('a.created_by_alias in ('. $includeAliases . ')', 'OR');
-						$otherAuthorAliasMatch = '(CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
-					}
-
-					// Calculate total_matches including authors, author aliases, current category, and other categories
-
-
-					// select other items based on the metakey field 'like' the keys found
-					$query->select('a.id, a.title, a.introtext');
-					$query->select('a.catid, cc.access AS cat_access');
-					$query->select('a.created_by, a.created_by_alias, u.name AS author');
-					$query->select('cc.published AS cat_state');
-					$query->select('CASE WHEN CHAR_LENGTH(a.alias) THEN CONCAT_WS(":", a.id, a.alias) ELSE a.id END as slug');
-					$query->select('CASE WHEN CHAR_LENGTH(cc.alias) THEN CONCAT_WS(":", cc.id, cc.alias) ELSE cc.id END as catslug');
-					$query->select('cc.title as category_title, a.introtext as introtext_raw, a.fulltext');
-					$query->select('a.metakey');
-					$query->from('#__content AS a');
-					$query->leftJoin('#__content_frontpage AS f ON f.content_id = a.id');
-					$query->leftJoin('#__categories AS cc ON cc.id = a.catid');
-					$query->leftJoin('#__users AS u ON u.id = a.created_by');
-					$query->where('a.id != '.(int) $id);
-					$query->where('a.state = 1');
-					$query->where('a.access IN (' . $userGroups . ')');
-					$query->where('cc.access IN (' . $userGroups . ')');
-					$query->where('cc.published = 1');
-					$query->where('(a.publish_up = '.$db->Quote($nullDate).' OR a.publish_up <= '.$db->Quote($now).' )');
-					$query->where('(a.publish_down = '.$db->Quote($nullDate).' OR a.publish_down >= '.$db->Quote($now).')');
-
-					// Plug in the WHERE clause of $selectQuery inside ()
-					$query->where('(' . substr((string) $selectQuery->where, 8) . ')');
-
-					$db->setQuery($query, 0, intval($params->get('count', 5)));
-					$temp = $db->loadObjectList();
-					$related = array();
-
-					if (count($temp) > 0)
-					{
-						foreach ($temp as $row)
-						{
-							$row->route = JRoute::_(ContentHelperRoute::getArticleRoute($row->slug, $row->catslug));
-							// add processing for intro text tooltip
-							if ($showTooltip)
-							{
-								// limit introtext to length if parameter set & it is needed
-								$strippedText = strip_tags($row->introtext);
-								$row->introtext = self::fixSefImages($row->introtext);
-								if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit))
-								{
-									$row->introtext = htmlspecialchars(self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
-								}
-								else
-								{
-									$row->introtext = htmlspecialchars($row->introtext);
-								}
-							}
-
-							// Get list of matching tags
-							if ($params->get('showMatchList', 0) && $row->match_count)
-							{
-								$tagNameArray = array();
-								$tagArray = explode(',', $row->match_list);
-								foreach ($tagArray as $tagId)
-								{
-									$tagNameArray[] = self::$mainArticleTags[$tagId];
-								}
-								$row->match_list = $tagNameArray;
-							}
-							$related[] = $row;
-
-						}
-					}
+					$ids = str_replace('C', self::$mainArticle->catid, JString::strtoupper($catid));
+					$ids = explode(',', $ids);
+					JArrayHelper::toInteger($ids);
+					$query->where('a.catid IN (' . implode(',', $ids) . ')');
 				}
+
+				if ($matchAuthor)
+				{
+					$selectQuery->where('a.created_by = ' . $db->quote(self::$mainArticle->created_by), 'OR');
+					$authorTotalMatch = '(CASE WHEN a.created_by = ' . self::$mainArticle->author . ' THEN 1 ELSE 0 END)';
+				}
+
+				if (($matchAuthorAlias) && (self::$mainArticle->created_by_alias))
+				{
+					$selectQuery->where('UPPER(a.created_by_alias) = ' . $db->quote(JString::strtoupper(self::$mainArticle->created_by_alias)), 'OR');
+					$authorAliasTotalMatch = '(CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
+				}
+
+				if ($matchCategory)
+				{
+					$selectQuery->where('a.catid = ' . $db->quote(self::$mainArticle->catid), 'OR');
+					$currentCategoryMatch = '(CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
+				}
+
+				if ($includeCategories > ' ')
+				{
+					$selectQuery->where('a.catid in (' . $includeCategories . ')', 'OR');
+					$otherCategoryMatch = '(CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
+				}
+
+				if ($includeAuthors > ' ')
+				{
+					$selectQuery->where('a.created_by IN (' . $includeAuthors . ')', 'OR');
+					$otherAuthorMatch = '(CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
+				}
+
+				if ($includeAliases > ' ')
+				{
+					$selectQuery->where('a.created_by_alias in (' . $includeAliases . ')', 'OR');
+					$otherAuthorAliasMatch = '(CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
+				}
+
+				// Calculate total_matches including authors, author aliases, current category, and other categories
+
+				// select other items based on the metakey field 'like' the keys found
+				$query->select('a.id, a.title, a.introtext');
+				$query->select('a.catid, cc.access AS cat_access');
+				$query->select('a.created_by, a.created_by_alias, u.name AS author');
+				$query->select('cc.published AS cat_state');
+				$query->select('CASE WHEN CHAR_LENGTH(a.alias) THEN CONCAT_WS(":", a.id, a.alias) ELSE a.id END as slug');
+				$query->select('CASE WHEN CHAR_LENGTH(cc.alias) THEN CONCAT_WS(":", cc.id, cc.alias) ELSE cc.id END as catslug');
+				$query->select('cc.title as category_title, a.introtext as introtext_raw, a.fulltext');
+				$query->select('a.metakey');
+				$query->from('#__content AS a');
+				$query->leftJoin('#__content_frontpage AS f ON f.content_id = a.id');
+				$query->leftJoin('#__categories AS cc ON cc.id = a.catid');
+				$query->leftJoin('#__users AS u ON u.id = a.created_by');
+				$query->where('a.id != ' . (int) $id);
+				$query->where('a.state = 1');
+
+				$userGroups = implode(',', JFactory::getUser()->getAuthorisedViewLevels());
+				$query->where('a.access IN (' . $userGroups . ')');
+				$query->where('cc.access IN (' . $userGroups . ')');
+				$query->where('cc.published = 1');
+
+				$nullDate = $db->getNullDate();
+				$now  = JFactory::getDate()->toSQL();
+				$query->where('(a.publish_up = ' . $db->quote($nullDate) . ' OR a.publish_up <= ' . $db->quote($now) . ' )');
+				$query->where('(a.publish_down = ' . $db->quote($nullDate) . ' OR a.publish_down >= ' . $db->quote($now) . ')');
+
+				// Plug in the WHERE clause of $selectQuery inside ()
+				$query->where('(' . substr((string) $selectQuery->where, 8) . ')');
+
+				$db->setQuery($query, 0, intval($params->get('count', 5)));
+				$rows = $db->loadObjectList();
+
+				$related = self::processArticleList($rows);
+
 			}
 
 			return $related;
@@ -360,6 +238,38 @@ class modFJRelatedPlusHelper
 		return (substr($rawText, 0, $j)); // return up to this char
 	}
 
+	protected static function getSelectQuery($params)
+	{
+		$selectQuery = JFactory::getDbo()->getQuery(true);
+		switch ($params->get('anyOrAll', 'any'))
+		{
+			case 'all':
+				$selectQuery->where('m.matching_tag_count = ' . $count, 'OR');
+				break;
+			case 'exact':
+				$selectQuery->where('(m.matching_tag_count = ' . $count . ' AND m.matching_tag_count = m.total_tag_count)', 'OR');
+				break;
+			default:
+				$minimumMatches = intval($params->get('minimumMatches', 1));
+				$minimumMatches = ($minimumMatches > 0) ? $minimumMatches : 1;
+				$selectQuery->where('m.matching_tag_count >= ' . $minimumMatches, 'OR');
+		}
+		return $selectQuery;
+	}
+
+	protected static function getTagQueryString()
+	{
+		$tagQuery = JFactory::getDbo()->getQuery(true);
+		$tagQuery->from('#__contentitem_tag_map')
+			->select('content_item_id')
+			->select('COUNT(*) AS total_tag_count')
+			->select('SUM(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN 1 ELSE 0 END) AS matching_tag_count')
+			->select('GROUP_CONCAT(CASE WHEN tag_id IN (' . implode(',', array_keys(self::$mainArticleTags)) . ') THEN tag_id ELSE null END) AS matching_tags')
+			->where('type_alias = \'com_content.article\'')
+			->group('content_item_id');
+		return '(' . trim((string) $tagQuery) . ')';
+	}
+
 	/**
 	 * Function to get tag title from an array of tag ids
 	 *
@@ -367,14 +277,14 @@ class modFJRelatedPlusHelper
 	 *
 	 * @return  array  associative array: tag id => tag title
 	 */
-	protected static function getTagTitles($includeTags)
+	protected static function getTagTitles($tagIds)
 	{
-		JArrayHelper::toInteger($includeTags);
+		JArrayHelper::toInteger($tagIds);
 		$db = JFactory::getDbo();
 		$query = $db->getQuery(true);
 		$query->select('t.id, t.title')
 			->from('#__tags AS t')
-			->where('t.id IN (' . implode(',', $includeTags) . ')');
+			->where('t.id IN (' . implode(',', $tagIds) . ')');
 		$db->setQuery($query);
 		$objectArray = $db->loadObjectList();
 		$return = array();
@@ -425,6 +335,51 @@ class modFJRelatedPlusHelper
 		return $string;
 	}
 
+	protected static function processArticleList($rows)
+	{
+		$related = array();
+
+		if (count($rows) > 0)
+		{
+			foreach ($rows as $row)
+			{
+				$row->route = JRoute::_(ContentHelperRoute::getArticleRoute($row->slug, $row->catslug));
+				// add processing for intro text tooltip
+				if (self::$params->get('show_tooltip', 1))
+				{
+					// limit introtext to length if parameter set & it is needed
+					$strippedText = strip_tags($row->introtext);
+					$row->introtext = self::fixSefImages($row->introtext);
+
+					$tooltipLimit = (int) self::$params->get('max_chars', 250);
+					if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit))
+					{
+						$row->introtext = htmlspecialchars(self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
+					}
+					else
+					{
+						$row->introtext = htmlspecialchars($row->introtext);
+					}
+				}
+
+				// Get list of matching tags
+				if (self::$params->get('showMatchList', 0) && $row->match_count)
+				{
+					$tagNameArray = array();
+					$tagArray = explode(',', $row->match_list);
+					foreach ($tagArray as $tagId)
+					{
+						$tagNameArray[] = self::$mainArticleTags[$tagId];
+					}
+					$row->match_list = $tagNameArray;
+				}
+				$related[] = $row;
+			}
+			return $related;
+		}
+
+	}
+
 	protected static function selectArticle($id)
 	{
 		$db	= JFactory::getDBO();
@@ -457,6 +412,60 @@ class modFJRelatedPlusHelper
 				self::$mainArticleTags[$tagObject->id] = $tagObject->title;
 			}
 		}
+	}
+
+	protected static function setDateOrderBy($params)
+	{
+		$query = JFactory::getDbo()->getQuery(true);
+
+		// get the ordering for the query
+		if ($params->get('showDate', 'none') == 'modify')
+		{
+			$query->select('a.modified as date');
+			$dateOrderby = 'a.modified';
+		}
+		elseif ($params->get('showDate', 'none') == 'published')
+		{
+			$query->select('a.publish_up as date');
+			$dateOrderby = 'a.publish_up';
+		}
+		else
+		{
+			$query->select('a.created as date');
+			$dateOrderby = 'a.created';
+		}
+
+		switch ($params->get('ordering', 'alpha'))
+		{
+			case 'alpha':
+				$query->order('a.title');
+				break;
+
+			case 'rdate':
+				$query->order($dateOrderby . ' DESC, a.title ASC');
+				break;
+
+			case 'date':
+				$query->order($dateOrderby . ' ASC, a.title ASC');
+				break;
+
+			case 'bestmatch':
+				$query->order('match_count DESC');
+				break;
+
+			case 'article_order':
+				$query->order('cc.lft ASC, a.ordering ASC, a.title ASC');
+				break;
+
+			case 'random':
+				$query->select('rand() as random');
+				$query->order('random ASC');
+				break;
+
+			default:
+				$query->order('a.title ASC');
+		}
+		return $query;
 	}
 
 }
