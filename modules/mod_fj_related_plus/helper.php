@@ -42,10 +42,10 @@ class modFJRelatedPlusHelper
 			$includeTags = $params->get('include_tags');
 
 			$includeCategories = (is_array($params->get('fj_include_categories')))
-				? implode(',', $params->get('fj_include_categories')) : $params->get('fj_include_categories');
+				? implode(',', array_map('intval', $params->get('fj_include_categories'))) : $params->get('fj_include_categories');
 
 			$includeAuthors	= (is_array($params->get('fj_include_authors')))
-				? implode(',', $params->get('fj_include_authors')) : $params->get('fj_include_authors');
+				? implode(',', array_map('intval', $params->get('fj_include_authors'))) : $params->get('fj_include_authors');
 
 			$includeAliases	= (is_array($params->get('fj_include_alias')))
 				? implode(',', array_map(array('self', 'dbQuote'), $params->get('fj_include_alias')))
@@ -70,7 +70,7 @@ class modFJRelatedPlusHelper
 
 			if (self::$params->get('include_tags'))
 			{
-				self::$includeTagArray = self::$params->get('include_tags');
+				self::$includeTagArray = array_map('intval', self::$params->get('include_tags'));
 				$includedTagsArray = self::getTagTitles(self::$includeTagArray);
 				self::$mainArticleTags = self::$mainArticleTags + $includedTagsArray;
 			}
@@ -79,8 +79,7 @@ class modFJRelatedPlusHelper
 			// get array of tags to ignore
 			if ($params->get('ignore_tags', ''))
 			{
-				$ignoreTagIds = $params->get('ignore_tags', '');
-				JArrayHelper::toInteger($ignoreTagIds);
+				$ignoreTagIds = array_map('intval', self::$params->get('ignore_tags', ''));
 				$ignoredTagsArray = self::getTagTitles($ignoreTagIds);
 				self::$mainArticleTags = array_diff_assoc(self::$mainArticleTags, $ignoredTagsArray);
 			}
@@ -213,7 +212,7 @@ class modFJRelatedPlusHelper
 	 * @param $rawText
 	 * @return string
 	 */
-	public static function getUpToLastSpace($rawText)
+	protected static function getUpToLastSpace($rawText)
 	{
 		$throwAway = strrchr($rawText, ' ');
 		$endPosition = strlen($rawText) - strlen($throwAway);
@@ -227,7 +226,7 @@ class modFJRelatedPlusHelper
 	 * @param $maxLength max length
 	 * @return unknown_type
 	 */
-	public static function getPreview($rawText, $maxLength) {
+	protected static function getPreview($rawText, $maxLength) {
 		$strippedText = substr(strip_tags($rawText), 0, $maxLength);
 		$strippedText = self::getUpToLastSpace($strippedText);
 		$j = 0; // counter in $rawText
@@ -317,7 +316,7 @@ class modFJRelatedPlusHelper
 	 * @param $buffer -- intro text to fix
 	 * @return $fixedText -- with image tags fixed for SEF
 	 */
-	public static function fixSefImages ($buffer) {
+	protected static function fixSefImages ($buffer) {
 		$config = JFactory::getConfig();
 		$sef = $config->get('config.sef');
 		if ($sef) // process if SEF option enabled
@@ -330,7 +329,7 @@ class modFJRelatedPlusHelper
 		return $buffer;
 	}
 
-	public static function dbQuote($string)
+	protected static function dbQuote($string)
 	{
 		if ($string)
 		{
