@@ -116,6 +116,8 @@ class modFJRelatedPlusHelper
 					$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
 				}
 
+				$totalMatches = '(CASE WHEN m.matching_tag_count IS NULL THEN 0 ELSE m.matching_tag_count END) ';
+
 				if ($catid > ' ' and (self::$mainArticle->catid > ' '))
 				{
 					$ids = str_replace('C', self::$mainArticle->catid, JString::strtoupper($catid));
@@ -126,39 +128,41 @@ class modFJRelatedPlusHelper
 
 				if ($matchAuthor)
 				{
-					$selectQuery->where('a.created_by = ' . $db->quote(self::$mainArticle->created_by), 'OR');
-					$authorTotalMatch = '(CASE WHEN a.created_by = ' . self::$mainArticle->author . ' THEN 1 ELSE 0 END)';
+					$selectQuery->where('a.created_by = ' . (int) self::$mainArticle->created_by, 'OR');
+					$totalMatches .= ' + (CASE WHEN a.created_by = ' . (int) self::$mainArticle->created_by . ' THEN 1 ELSE 0 END)';
 				}
 
 				if (($matchAuthorAlias) && (self::$mainArticle->created_by_alias))
 				{
 					$selectQuery->where('UPPER(a.created_by_alias) = ' . $db->quote(JString::strtoupper(self::$mainArticle->created_by_alias)), 'OR');
-					$authorAliasTotalMatch = '(CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
 				}
 
 				if ($matchCategory)
 				{
 					$selectQuery->where('a.catid = ' . $db->quote(self::$mainArticle->catid), 'OR');
-					$currentCategoryMatch = '(CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
 				}
 
 				if ($includeCategories > ' ')
 				{
 					$selectQuery->where('a.catid in (' . $includeCategories . ')', 'OR');
-					$otherCategoryMatch = '(CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
 				}
 
 				if ($includeAuthors > ' ')
 				{
 					$selectQuery->where('a.created_by IN (' . $includeAuthors . ')', 'OR');
-					$otherAuthorMatch = '(CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
 				}
 
 				if ($includeAliases > ' ')
 				{
 					$selectQuery->where('a.created_by_alias in (' . $includeAliases . ')', 'OR');
-					$otherAuthorAliasMatch = '(CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
 				}
+
+				$query->select($totalMatches . ' AS total_matches');
 
 				// Calculate total_matches including authors, author aliases, current category, and other categories
 

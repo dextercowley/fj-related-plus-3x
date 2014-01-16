@@ -8,10 +8,10 @@
 // no direct access
 defined('_JEXEC') or die('Restricted access');
 JHTML::_('behavior.tooltip');
-$showDate = $params->def('showDate', 'none') != 'none';
-$showCount = $params->def('showMatchCount', 0);
+$showDate = $params->get('showDate', 'none') != 'none';
+$showCount = $params->get('showMatchCount', 0);
 $showMatchList = $params->def('showMatchList', 0);
-$dateFormat = $params->def('date_format', JText::_('DATE_FORMAT_LC4'));
+$dateFormat = $params->get('date_format', JText::_('DATE_FORMAT_LC4'));
 $showTooltip = $params->get('show_tooltip', '1');
 $titleLinkable = $params->get('fj_title_linkable'); ?>
 
@@ -34,19 +34,20 @@ $titleLinkable = $params->get('fj_title_linkable'); ?>
 				<?php echo $item->title; ?>
 			<?php endif; ?>
 			<?php if ($showCount) : ?>
-				<?php echo JText::plural('MOD_FJRELATEDPLUS_N_MATCHES', $item->match_count); ?>
+				<?php echo JText::plural('MOD_FJRELATEDPLUS_N_MATCHES', $item->total_matches); ?>
 			<?php endif; ?>
 
 			</span></a>
 		<?php endif; ?>
 		<?php if (!($showTooltip) && ($titleLinkable)) :?>
 			<a href="<?php echo $item->route; ?>" class="fj_relatedplus<?php echo $params->get('moduleclass_sfx'); ?>">
-		 	<?php echo $item->title;
-			if ($showDate) echo ' - ' . JHTML::_('date', $item->date, $dateFormat);
-			if ($showCount) {
-				echo ($item->match_count == 1) ? ' (1 '. JText::_('match') . ')' :
-					' (' . $item->match_count . ' ' . JText::_('matches') . ')';
-			} ?>
+		 	<?php echo $item->title; ?>
+			<?php if ($showDate) : ?>
+				<?php echo ' - ' . JHTML::_('date', $item->date, $dateFormat); ?>
+			<?php endif; ?>
+			<?php if ($showCount) : ?>
+				<?php echo JText::plural('MOD_FJRELATEDPLUS_N_MATCHES', $item->total_matches); ?>
+			<?php endif; ?>
 			</a>
 		<?php endif; ?>
 
