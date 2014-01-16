@@ -208,6 +208,33 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
+	 * Function to test whether we are in an article view.
+	 *
+	 * @return boolean True if current view is an article
+	 */
+	public static function isArticle() {
+		$option = JRequest::getCmd('option');
+		$view = JRequest::getCmd('view');
+		$id	= JRequest::getInt('id');
+		// return True if this is an article
+		return ($option == 'com_content' && $view == 'article' && $id);
+	}
+	/**
+	 * Function for use in array_map to quote string values in an array
+	 *
+	 * @param string  $string  string to be quoted
+	 * @return string          quoted string (using database quote method)
+	 */
+	protected static function dbQuote($string)
+	{
+		if ($string)
+		{
+			$string = JFactory::getDBO()->quote($string);
+		}
+		return $string;
+	}
+
+	/**
 	 * Cleans up the intro text if we are using tooltip preview
 	 *
 	 * @param stdClass  $row  Row object
@@ -236,18 +263,22 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
-	 * This function returns the text up to the last space in the string.
-	 * This is used to always break the introtext at a space (to avoid breaking in
-	 * the middle of a special character, for example.
+	 * Function to fix SEF images in tooltip -- add base to image URL
 	 *
-	 * @param $rawText
-	 * @return string
+	 * @param string  $buffer  intro text to fix
+	 * @return string          text with image tags fixed for SEF
 	 */
-	protected static function getUpToLastSpace($rawText)
-	{
-		$throwAway = strrchr($rawText, ' ');
-		$endPosition = strlen($rawText) - strlen($throwAway);
-		return substr($rawText, 0, $endPosition);
+	protected static function fixSefImages ($buffer) {
+		$config = JFactory::getConfig();
+		$sef = $config->get('config.sef');
+		if ($sef) // process if SEF option enabled
+		{
+			$base   = JURI::base(true).'/';
+			$protocols = '[a-zA-Z0-9]+:'; //To check for all unknown protocals (a protocol must contain at least one alpahnumeric fillowed by :
+			$regex     = '#(src|href)="(?!/|'.$protocols.'|\#|\')([^"]*)"#m';
+			$buffer    = preg_replace($regex, "$1=\"$base\$2\"", $buffer);
+		}
+		return $buffer;
 	}
 
 	/**
@@ -366,50 +397,18 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
-	 * Function to test whether we are in an article view.
+	 * This function returns the text up to the last space in the string.
+	 * This is used to always break the introtext at a space (to avoid breaking in
+	 * the middle of a special character, for example.
 	 *
-	 * @return boolean True if current view is an article
+	 * @param $rawText
+	 * @return string
 	 */
-	public static function isArticle() {
-		$option = JRequest::getCmd('option');
-		$view = JRequest::getCmd('view');
-		$id	= JRequest::getInt('id');
-		// return True if this is an article
-		return ($option == 'com_content' && $view == 'article' && $id);
-	}
-
-	/**
-	 * Function to fix SEF images in tooltip -- add base to image URL
-	 *
-	 * @param string  $buffer  intro text to fix
-	 * @return string          text with image tags fixed for SEF
-	 */
-	protected static function fixSefImages ($buffer) {
-		$config = JFactory::getConfig();
-		$sef = $config->get('config.sef');
-		if ($sef) // process if SEF option enabled
-		{
-			$base   = JURI::base(true).'/';
-			$protocols = '[a-zA-Z0-9]+:'; //To check for all unknown protocals (a protocol must contain at least one alpahnumeric fillowed by :
-			$regex     = '#(src|href)="(?!/|'.$protocols.'|\#|\')([^"]*)"#m';
-			$buffer    = preg_replace($regex, "$1=\"$base\$2\"", $buffer);
-		}
-		return $buffer;
-	}
-
-	/**
-	 * Function for use in array_map to quote string values in an array
-	 *
-	 * @param string  $string  string to be quoted
-	 * @return string          quoted string (using database quote method)
-	 */
-	protected static function dbQuote($string)
+	protected static function getUpToLastSpace($rawText)
 	{
-		if ($string)
-		{
-			$string = JFactory::getDBO()->quote($string);
-		}
-		return $string;
+		$throwAway = strrchr($rawText, ' ');
+		$endPosition = strlen($rawText) - strlen($throwAway);
+		return substr($rawText, 0, $endPosition);
 	}
 
 	/**
