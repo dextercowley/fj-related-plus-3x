@@ -24,6 +24,12 @@ class modFJRelatedPlusHelper
 	static $includeTagArray = array();
 	static $params = null;
 
+	/**
+	 * Gets the list of articles for the module
+	 *
+	 * @param JRegistry  $params  the parameters for the module
+	 * @return array              array of row objects for the articles in the module
+	 */
 	public static function getList($params)
 	{
 		self::$params = $params;
@@ -95,11 +101,9 @@ class modFJRelatedPlusHelper
 				($includeTags)) // or include tags
 			{
 				$db	= JFactory::getDBO();
-
-
 				$query = self::setDateOrderBy(self::$params);
 
-				// TODO: make sure this excludes tags to ignore and includes additional tags at this point
+				// At this point, tags have been adjusted for included and ignored tags.
 				if (count(self::$mainArticleTags) > 0)
 				{
 					// $tagQuery is used to build subquery for getting tag information from the mapping table
@@ -115,14 +119,14 @@ class modFJRelatedPlusHelper
 					$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
 				}
 
+				// Calculate total matches, including tags and other selections (author, alias, category)
 				$totalMatches = '(CASE WHEN m.matching_tag_count IS NULL THEN 0 ELSE m.matching_tag_count END) ';
 
 				if ($catid > ' ' and (self::$mainArticle->catid > ' '))
 				{
 					$ids = str_replace('C', self::$mainArticle->catid, JString::strtoupper($catid));
 					$ids = explode(',', $ids);
-					JArrayHelper::toInteger($ids);
-					$query->where('a.catid IN (' . implode(',', $ids) . ')');
+					$query->where('a.catid IN (' . implode(',', array_map('intval', $ids)) . ')');
 				}
 
 				if ($matchAuthor)
@@ -198,17 +202,44 @@ class modFJRelatedPlusHelper
 				$rows = $db->loadObjectList();
 
 				$related = self::processArticleList($rows);
-
 			}
-
 			return $related;
 		}
+	}
+
+	/**
+	 * Cleans up the intro text if we are using tooltip preview
+	 *
+	 * @param stdClass  $row  Row object
+	 * @return  string  processed introtext string
+	 */
+	protected static function fixIntroText($row)
+	{
+		// add processing for intro text tooltip
+		if (self::$params->get('show_tooltip', 1))
+		{
+			// limit introtext to length if parameter set & it is needed
+			$strippedText = strip_tags($row->introtext);
+			$row->introtext = self::fixSefImages($row->introtext);
+
+			$tooltipLimit = (int) self::$params->get('max_chars', 250);
+			if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit))
+			{
+				$row->introtext = htmlspecialchars(self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
+			}
+			else
+			{
+				$row->introtext = htmlspecialchars($row->introtext);
+			}
+		}
+		return $row->introtext;
 	}
 
 	/**
 	 * This function returns the text up to the last space in the string.
 	 * This is used to always break the introtext at a space (to avoid breaking in
 	 * the middle of a special character, for example.
+	 *
 	 * @param $rawText
 	 * @return string
 	 */
@@ -222,6 +253,7 @@ class modFJRelatedPlusHelper
 	/**
 	 * Function to extract first n chars of text, ignoring HTML tags.
 	 * Text is broken at last space before max chars in stripped text
+	 *
 	 * @param $rawText full text with tags
 	 * @param $maxLength max length
 	 * @return unknown_type
@@ -241,6 +273,35 @@ class modFJRelatedPlusHelper
 		return (substr($rawText, 0, $j)); // return up to this char
 	}
 
+	/**
+	 * Creates the text list of matching tags and other values (author, category, etc.)
+	 *
+	 * @param stdClass  $row  Row object from the query
+	 * @return  string        Processed match list for display
+	 */
+	protected static function getMatchList($row)
+	{
+		// Get list of matching tags
+		if (self::$params->get('showMatchList', 0) && $row->match_count)
+		{
+			$tagNameArray = array();
+			$tagArray = explode(',', $row->match_list);
+			foreach ($tagArray as $tagId)
+			{
+				$tagNameArray[] = self::$mainArticleTags[$tagId];
+			}
+			$row->match_list = $tagNameArray;
+		}
+		return $row->match_list;
+	}
+
+	/**
+	 * Gets the selection subquery. This allows us to create an OR condition inside the select clause
+	 * of the main query.
+	 *
+	 * @param  JRegistry  $params
+	 * @return JDatabaseQuery   Query object for the sub-selection.
+	 */
 	protected static function getSelectQuery($params)
 	{
 		$selectQuery = JFactory::getDbo()->getQuery(true);
@@ -260,6 +321,12 @@ class modFJRelatedPlusHelper
 		return $selectQuery;
 	}
 
+	/**
+	 * Creates the subquery for getting the tags for the current article. This is used as a table
+	 * in the main query.
+	 *
+	 * @return string  Subquery text for insertion into the main query as a table.
+	 */
 	protected static function getTagQueryString()
 	{
 		$tagQuery = JFactory::getDbo()->getQuery(true);
@@ -301,7 +368,7 @@ class modFJRelatedPlusHelper
 	/**
 	 * Function to test whether we are in an article view.
 	 *
-	 * returns boolean True if current view is an article
+	 * @return boolean True if current view is an article
 	 */
 	public static function isArticle() {
 		$option = JRequest::getCmd('option');
@@ -313,8 +380,9 @@ class modFJRelatedPlusHelper
 
 	/**
 	 * Function to fix SEF images in tooltip -- add base to image URL
-	 * @param $buffer -- intro text to fix
-	 * @return $fixedText -- with image tags fixed for SEF
+	 *
+	 * @param string  $buffer  intro text to fix
+	 * @return string          text with image tags fixed for SEF
 	 */
 	protected static function fixSefImages ($buffer) {
 		$config = JFactory::getConfig();
@@ -329,6 +397,12 @@ class modFJRelatedPlusHelper
 		return $buffer;
 	}
 
+	/**
+	 * Function for use in array_map to quote string values in an array
+	 *
+	 * @param string  $string  string to be quoted
+	 * @return string          quoted string (using database quote method)
+	 */
 	protected static function dbQuote($string)
 	{
 		if ($string)
@@ -338,6 +412,13 @@ class modFJRelatedPlusHelper
 		return $string;
 	}
 
+	/**
+	 * Process article rows from query
+	 *
+	 * @param array  $rows  array of row objects from query
+	 *
+	 * @return array  processed array of row objects
+	 */
 	protected static function processArticleList($rows)
 	{
 		$related = array();
@@ -347,42 +428,20 @@ class modFJRelatedPlusHelper
 			foreach ($rows as $row)
 			{
 				$row->route = JRoute::_(ContentHelperRoute::getArticleRoute($row->slug, $row->catslug));
-				// add processing for intro text tooltip
-				if (self::$params->get('show_tooltip', 1))
-				{
-					// limit introtext to length if parameter set & it is needed
-					$strippedText = strip_tags($row->introtext);
-					$row->introtext = self::fixSefImages($row->introtext);
+				$row->introtext = self::fixIntroText($row);
+				$row->match_list = self::getMatchList($row);
 
-					$tooltipLimit = (int) self::$params->get('max_chars', 250);
-					if (($tooltipLimit > 0) && (strlen($strippedText) > $tooltipLimit))
-					{
-						$row->introtext = htmlspecialchars(self::getPreview($row->introtext, $tooltipLimit)) . ' ...';
-					}
-					else
-					{
-						$row->introtext = htmlspecialchars($row->introtext);
-					}
-				}
-
-				// Get list of matching tags
-				if (self::$params->get('showMatchList', 0) && $row->match_count)
-				{
-					$tagNameArray = array();
-					$tagArray = explode(',', $row->match_list);
-					foreach ($tagArray as $tagId)
-					{
-						$tagNameArray[] = self::$mainArticleTags[$tagId];
-					}
-					$row->match_list = $tagNameArray;
-				}
 				$related[] = $row;
 			}
-			return $related;
 		}
-
+		return $related;
 	}
 
+	/**
+	 * Get the current article and its tags and set class values
+	 *
+	 * @param integer $id
+	 */
 	protected static function selectArticle($id)
 	{
 		$db	= JFactory::getDBO();
@@ -417,6 +476,12 @@ class modFJRelatedPlusHelper
 		}
 	}
 
+	/**
+	 * Sets the query order by and date selection
+	 *
+	 * @param   JRegistry       $params  module parameters
+	 * @return  JDatabaseQuery  $query
+	 */
 	protected static function setDateOrderBy($params)
 	{
 		$query = JFactory::getDbo()->getQuery(true);
