@@ -30,8 +30,6 @@
 		<fields name="params">
 			<fieldset name="layout" >
 				<field name="count" type="text" default="5" label="Count" description="PARAMARTICLECOUNT" />
-				<field name="minimumMatches" type="text" default="1" filter="integer" label="Minimum_Matches" description="PARAMFJMINIMUMMATCHES" />		
-  				<field type="spacer" hr="true" />
  				<field name="ordering" type="list" default="alpha" label="Ordering" description="PARAMORDERING">
 					<option value="alpha">Title_Alphabetical</option>
 					<option value="rdate">Recently_Added_First</option>
@@ -61,17 +59,18 @@
 				<field name="noRelatedText" type="text" default="" size = "50" label="Text_If_No_Related" description="PARAMNORELATEDTEXT" />		
 			</fieldset>
 			<fieldset name="filter" >
+				<field name="anyOrAll" type="list" default="any" label="MOD_FJRELATED_MATCH_ANY_ALL_LABEL" description="MOD_FJRELATED_MATCH_ANY_ALL_DESC">
+					<option value="any">MOD_FJRELATED_OPTION_ANY</option>
+					<option value="all">JAll</option>
+					<option value="exact">MOD_FJRELATED_OPTION_EXACT</option>
+				</field>
+				<field name="minimumMatches" type="text" default="1" filter="integer" label="Minimum_Matches" description="PARAMFJMINIMUMMATCHES" />		
 				<field type="spacer" label="SPACERLIMITDESC" />
 				<field name="catid" type="category" extension="com_content" multiple="multiple" size="5" label="Categories" description="FJ_RELATED_PARAMCATEGORIES"/>			
 			</fieldset>
 			<fieldset name="include" >
 				<field type="spacer" label="FJSPACERINCLUDEALLDESC" />
    				<field type="spacer" label="SPACERAUTHORDESC" />
-				<field name="anyOrAll" type="list" default="any" label="MOD_FJRELATED_MATCH_ANY_ALL_LABEL" description="MOD_FJRELATED_MATCH_ANY_ALL_DESC">
-				<option value="any">MOD_FJRELATED_OPTION_ANY</option>
-				<option value="all">JAll</option>
-				<option value="exact">MOD_FJRELATED_OPTION_EXACT</option>
-			</field>
 				<field name="matchAuthor" type="radio" default="0" label="Match_on_Author" description="PARAMAUTHORMATCH">
 					<option value="0">JNO</option>
 					<option value="1">JYES</option>
