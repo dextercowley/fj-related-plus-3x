@@ -37,33 +37,21 @@ class modFJRelatedPlusHelper
 		// only do this if this is an article or if we are showing this module for any menu item type
 		if (self::isArticle() || ($includeMenuTypes == 'any')) //only show for article pages
 		{
+			$db	= JFactory::getDBO();
 			// process categories either as comma-delimited list or as array
 			// (for backward compatibility)
 			$catid = (is_array($params->get('catid'))) ?
 				implode(',', $params->get('catid') ) : trim($params->get('catid'));
 
-			$matchAuthor = trim($params->get('matchAuthor', 0));
-			$matchAuthorAlias = trim($params->get('matchAuthorAlias', 0));
+			$matchAuthor = $params->get('matchAuthor', 0);
+			$matchAuthorAlias = $params->get('matchAuthorAlias', 0);
 			$matchCategory = $params->get('fjmatchCategory');
 			$includeTags = $params->get('include_tags');
-
-			$includeCategories = (is_array($params->get('fj_include_categories')))
-				? implode(',', array_map('intval', $params->get('fj_include_categories'))) : $params->get('fj_include_categories');
-
-			$includeAuthors	= (is_array($params->get('fj_include_authors')))
-				? implode(',', array_map('intval', $params->get('fj_include_authors'))) : $params->get('fj_include_authors');
-
-			$includeAliases	= (is_array($params->get('fj_include_alias')))
-				? implode(',', array_map(array('self', 'dbQuote'), $params->get('fj_include_alias')))
-				: self::dbQuote($params->get('fj_include_alias'));
-
-			$related = array();
-			$matching_tags = array();
 
 			$id = JFactory::getApplication()->input->getInt('id');
 			if (self::isArticle())
 			{
-				self::selectArticle($id);
+				self::getArticle($id);
 			}
 			else
 			{
@@ -73,6 +61,38 @@ class modFJRelatedPlusHelper
 					'created_by' => '');
 				self::$mainArticle = JArrayHelper::toObject($articleArray);
 			}
+
+			// If we are matching on current category, we need to exclude from other categories list
+			$includeCategoryArray = (is_array($params->get('fj_include_categories')))
+				? $params->get('fj_include_categories') : explode(',', $params->get('fj_include_categories'));
+			$includeCategoryArray = array_map('intval', $includeCategoryArray);
+			if ($matchCategory)
+			{
+				$includeCategoryArray = array_diff($includeCategoryArray, array(self::$mainArticle->catid));
+			}
+			$includeCategories = implode(',', $includeCategoryArray);
+
+			$includeAuthorArray	= (is_array($params->get('fj_include_authors')))
+				? $params->get('fj_include_authors') : explode(',', $params->get('fj_include_authors'));
+			$includeAuthorArray = array_map('intval', $includeAuthorArray);
+			// If we are matching on current article's author we need to exclude current author from list
+			if ($matchAuthor)
+			{
+				$includeAuthorArray = array_diff($includeAuthorArray, array(self::$mainArticle->created_by));
+			}
+			$includeAuthors = implode(',', $includeAuthorArray);
+
+			$includeAliasArray	= (is_array($params->get('fj_include_alias'))) ? $params->get('fj_include_alias') : explode(',', $params->get('fj_include_alias'));
+			$includeAliasArray = array_map(array('self', 'dbQuote'), $includeAliasArray);
+			// If we are matching on current articles alias, we need to exclude this from the list
+			if ($matchAuthorAlias)
+			{
+				$includeAliasArray = array_udiff($includeAliasArray, array($db->quote(self::$mainArticle->created_by_alias)), 'strcasecmp');
+			}
+			$includeAliases = implode(',', $includeAliasArray);
+
+			$related = array();
+			$matching_tags = array();
 
 			if (self::$params->get('include_tags'))
 			{
@@ -100,7 +120,6 @@ class modFJRelatedPlusHelper
 				($includeAliases > ' ') || // or other author aliases
 				($includeTags)) // or include tags
 			{
-				$db	= JFactory::getDBO();
 				$query = self::setDateOrderBy(self::$params);
 
 				// At this point, tags have been adjusted for included and ignored tags.
@@ -138,7 +157,7 @@ class modFJRelatedPlusHelper
 				if (($matchAuthorAlias) && (self::$mainArticle->created_by_alias))
 				{
 					$selectQuery->where('UPPER(a.created_by_alias) = ' . $db->quote(JString::strtoupper(self::$mainArticle->created_by_alias)), 'OR');
-					$totalMatches .= ' + (CASE WHEN UPPER(a.created_by_alias) = ' . strtoupper(self::$mainArticle->author) . ') THEN 1 ELSE 0 END)';
+					$totalMatches .= ' + (CASE WHEN UPPER(a.created_by_alias) = ' . $db->quote(self::$mainArticle->created_by_alias) . ' THEN 1 ELSE 0 END)';
 				}
 
 				if ($matchCategory)
@@ -149,7 +168,7 @@ class modFJRelatedPlusHelper
 
 				if ($includeCategories > ' ')
 				{
-					$selectQuery->where('a.catid in (' . $includeCategories . ')', 'OR');
+					$selectQuery->where('a.catid IN (' . $includeCategories . ')', 'OR');
 					$totalMatches .= ' + (CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
 				}
 
@@ -161,7 +180,7 @@ class modFJRelatedPlusHelper
 
 				if ($includeAliases > ' ')
 				{
-					$selectQuery->where('a.created_by_alias in (' . $includeAliases . ')', 'OR');
+					$selectQuery->where('a.created_by_alias IN (' . $includeAliases . ')', 'OR');
 					$totalMatches .= ' + (CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
 				}
 
@@ -219,6 +238,7 @@ class modFJRelatedPlusHelper
 		// return True if this is an article
 		return ($option == 'com_content' && $view == 'article' && $id);
 	}
+
 	/**
 	 * Function for use in array_map to quote string values in an array
 	 *
@@ -282,6 +302,45 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
+	 * Get the current article and its tags and set class values
+	 *
+	 * @param integer $id
+	 */
+	protected static function getArticle($id)
+	{
+		$db	= JFactory::getDBO();
+		// select the author info from the item
+		$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
+			' cc.title as category_title, u.name as author ' .
+			' FROM #__content AS a' .
+			' LEFT JOIN #__categories AS cc ON cc.id = a.catid' .
+			' LEFT JOIN #__users AS u ON u.id = a.created_by' .
+			' WHERE a.id = '.(int) $id;
+		$db->setQuery($query);
+		self::$mainArticle = $db->loadObject();
+
+		// If ignoring all tags, we don't need to get the tags for the article
+		if (!self::$params->get('ignore_all_tags', 0))
+		{
+			// Get tags for this article.
+			// Load the tags from the mapping table
+			$query = $db->getQuery(true);
+			$query->select('t.id, t.title')
+			->from('#__tags AS t')
+			->innerJoin('#__contentitem_tag_map AS m ON t.id = m.tag_id')
+			->where("m.type_alias = 'com_content.article'")
+			->where('content_item_id = ' . $id)
+			->order('t.title ASC');
+			$db->setQuery($query);
+			$tagObjects = $db->loadObjectList();
+			foreach ($tagObjects as $tagObject)
+			{
+				self::$mainArticleTags[$tagObject->id] = $tagObject->title;
+			}
+		}
+	}
+
+	/**
 	 * Function to extract first n chars of text, ignoring HTML tags.
 	 * Text is broken at last space before max chars in stripped text
 	 *
@@ -323,6 +382,50 @@ class modFJRelatedPlusHelper
 			}
 			$row->match_list = $tagNameArray;
 		}
+
+		// Check for author match with main article
+		if (self::$params->get('matchAuthor', 0) && $row->created_by == self::$mainArticle->created_by)
+		{
+			$row->match_list[] = self::$mainArticle->author;
+		}
+		// Check include authors only if we don't already have a match
+		elseif (is_array(self::$params->get('fj_include_authors'))
+			&& count(self::$params->get('fj_include_authors')) > 0
+			&& in_array($row->created_by, self::$params->get('fj_include_authors')))
+		{
+			$row->match_list[] = $row->author;
+		}
+
+		// Check for author alias match with main article
+		if (self::$params->get('matchAuthorAlias', 0) && $row->created_by_alias > ' '
+			&& strtoupper($row->created_by_alias) == strtoupper(self::$mainArticle->created_by_alias))
+		{
+			$row->match_list[] = self::$mainArticle->created_by_alias;
+		}
+		// Check for include alias matches (only if we don't already have a match on main article alias)
+		elseif (is_array(self::$params->get('fj_include_alias'))
+			&& count(self::$params->get('fj_include_alias')) > 0
+			&& in_array(strtoupper($row->created_by_alias), array_map('strtoupper',self::$params->get('fj_include_alias'))))
+		{
+			$row->match_list[] = $row->created_by_alias;
+		}
+
+
+		// Check for current category matches
+		if (self::$params->get('fjmatchCategory') && self::$mainArticle->catid == $row->catid)
+		{
+			$row->match_list[] = self::$mainArticle->category_title;
+		}
+		// Check for include category matches (only if we don't already have a match
+		elseif (is_array(self::$params->get('fj_include_categories'))
+			&& count(self::$params->get('fj_include_categories')) > 0
+			&& in_array($row->catid, self::$params->get('fj_include_categories')))
+		{
+			$row->match_list[] = $row->category_title;
+		}
+
+
+
 		return $row->match_list;
 	}
 
@@ -437,45 +540,6 @@ class modFJRelatedPlusHelper
 	}
 
 	/**
-	 * Get the current article and its tags and set class values
-	 *
-	 * @param integer $id
-	 */
-	protected static function selectArticle($id)
-	{
-		$db	= JFactory::getDBO();
-		// select the author info from the item
-		$query = 'SELECT a.metakey, a.catid, a.created_by, a.created_by_alias,' .
-			' cc.title as category_title, u.name as author ' .
-			' FROM #__content AS a' .
-			' LEFT JOIN #__categories AS cc ON cc.id = a.catid' .
-			' LEFT JOIN #__users AS u ON u.id = a.created_by' .
-			' WHERE a.id = '.(int) $id;
-		$db->setQuery($query);
-		self::$mainArticle = $db->loadObject();
-
-		// If ignoring all tags, we don't need to get the tags for the article
-		if (!self::$params->get('ignore_all_tags', 0))
-		{
-			// Get tags for this article.
-			// Load the tags from the mapping table
-			$query = $db->getQuery(true);
-			$query->select('t.id, t.title')
-			->from('#__tags AS t')
-			->innerJoin('#__contentitem_tag_map AS m ON t.id = m.tag_id')
-			->where("m.type_alias = 'com_content.article'")
-			->where('content_item_id = ' . $id)
-			->order('t.title ASC');
-			$db->setQuery($query);
-			$tagObjects = $db->loadObjectList();
-			foreach ($tagObjects as $tagObject)
-			{
-				self::$mainArticleTags[$tagObject->id] = $tagObject->title;
-			}
-		}
-	}
-
-	/**
 	 * Sets the query order by and date selection
 	 *
 	 * @param   JRegistry       $params  module parameters
@@ -517,7 +581,7 @@ class modFJRelatedPlusHelper
 				break;
 
 			case 'bestmatch':
-				$query->order('match_count DESC');
+				$query->order('total_matches DESC, a.title ASC');
 				break;
 
 			case 'article_order':
