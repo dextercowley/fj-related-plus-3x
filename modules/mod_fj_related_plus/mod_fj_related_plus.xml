@@ -67,6 +67,11 @@
 			<fieldset name="include" >
 				<field type="spacer" label="FJSPACERINCLUDEALLDESC" />
    				<field type="spacer" label="SPACERAUTHORDESC" />
+				<field name="anyOrAll" type="list" default="any" label="MOD_FJRELATED_MATCH_ANY_ALL_LABEL" description="MOD_FJRELATED_MATCH_ANY_ALL_DESC">
+				<option value="any">MOD_FJRELATED_OPTION_ANY</option>
+				<option value="all">JAll</option>
+				<option value="exact">MOD_FJRELATED_OPTION_EXACT</option>
+			</field>
 				<field name="matchAuthor" type="radio" default="0" label="Match_on_Author" description="PARAMAUTHORMATCH">
 					<option value="0">JNO</option>
 					<option value="1">JYES</option>
