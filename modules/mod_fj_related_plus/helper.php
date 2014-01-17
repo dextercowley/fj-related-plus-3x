@@ -166,19 +166,19 @@ class modFJRelatedPlusHelper
 					$totalMatches .= ' + (CASE WHEN a.catid = ' . self::$mainArticle->catid . ' THEN 1 ELSE 0 END)';
 				}
 
-				if ($includeCategories > ' ')
+				if ($includeCategories)
 				{
 					$selectQuery->where('a.catid IN (' . $includeCategories . ')', 'OR');
 					$totalMatches .= ' + (CASE WHEN a.catid IN (' . $includeCategories . ') THEN 1 ELSE 0 END)';
 				}
 
-				if ($includeAuthors > ' ')
+				if ($includeAuthors)
 				{
 					$selectQuery->where('a.created_by IN (' . $includeAuthors . ')', 'OR');
 					$totalMatches .= ' + (CASE WHEN a.created_by IN (' . $includeAuthors . ') THEN 1 ELSE 0 END)';
 				}
 
-				if ($includeAliases > ' ')
+				if ($includeAliases)
 				{
 					$selectQuery->where('a.created_by_alias IN (' . $includeAliases . ')', 'OR');
 					$totalMatches .= ' + (CASE WHEN a.created_by_alias IN (' . $includeAliases . ') THEN 1 ELSE 0 END)';
@@ -439,6 +439,7 @@ class modFJRelatedPlusHelper
 	protected static function getSelectQuery($params)
 	{
 		$selectQuery = JFactory::getDbo()->getQuery(true);
+		$count = count(self::$mainArticleTags);
 		switch ($params->get('anyOrAll', 'any'))
 		{
 			case 'all':
