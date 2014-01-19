@@ -1,8 +1,7 @@
 <?php
 /**
- * @version		$Id: default.php 13 2009-07-07 22:23:18Z dextercowley $
  * @package		mod_fj_related_plus
- * @copyright	Copyright (C) 2008 Mark Dexter. All rights reserved.
+ * @copyright	Copyright (C) 2008 - 2014 Mark Dexter. All rights reserved.
  * @license		http://www.gnu.org/licenses/gpl.html
  */
 // no direct access

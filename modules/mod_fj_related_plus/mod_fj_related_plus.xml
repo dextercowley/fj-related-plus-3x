@@ -2,12 +2,12 @@
 <extension method="upgrade" type="module" version="3.0.0" client="site">
 	<name>mod_fj_related_plus</name>
 	<author>Mark Dexter</author>
-	<creationDate>November 2013</creationDate>
-	<copyright>(C) 2008-2013 Mark Dexter. All rights reserved.</copyright>
+	<creationDate>January 2014</creationDate>
+	<copyright>(C) 2008-2014 Mark Dexter. All rights reserved.</copyright>
 	<license>http://www.gnu.org/licenses/gpl.html</license>
 	<authorEmail>dextercowley@gmail.com</authorEmail>
 	<authorUrl>http://joomlacode.org/gf/project/freejoomla/wiki/</authorUrl>
-	<version>3.0.0</version>
+	<version>4.0.0</version>
 	<description>DESCFJRELATEDPLUS</description>
 	<files>
 		<filename module="mod_fj_related_plus">mod_fj_related_plus.php</filename>
@@ -24,7 +24,7 @@
 	<help url="FJ_RELATED_PLUS_HELP_URL" />
 	<updateservers>
 		<server type="extension" priority="1" name="FJ Related Plus Module"
-			>http://raw.github.com/dextercowley/fj-related-plus-3x/master/modules/mod_fj_related_plus/update/mod_fj_related_plus_update.xml</server>
+			>http://raw.github.com/dextercowley/fj-related-plus-3x/master-4/modules/mod_fj_related_plus/update/mod_fj_related_plus_update.xml</server>
 	</updateservers>
 	<config>
 		<fields name="params">

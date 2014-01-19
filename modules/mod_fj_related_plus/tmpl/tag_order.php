@@ -1,8 +1,7 @@
 <?php
 /**
- * @version		$Id: key_word.php 53 2010-12-05 16:13:50Z dextercowley $
  * @package		mod_fj_related_plus
- * @copyright	Copyright (C) 2008 Mark Dexter. All rights reserved.
+ * @copyright	Copyright (C) 2008 - 2014 Mark Dexter. All rights reserved.
  * @license		http://www.gnu.org/licenses/gpl.html
  */
 // no direct access
