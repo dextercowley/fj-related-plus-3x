@@ -13,13 +13,9 @@
 		<filename module="mod_fj_related_plus">mod_fj_related_plus.php</filename>
 		<filename>index.html</filename>
     	<filename>helper.php</filename>
-    	<filename>tmpl/default.php</filename>
-    	<filename>tmpl/index.html</filename>
-    	<filename>tmpl/key_word.php</filename>
-		<filename>fields/fjarticle.php</filename>
-    	<filename>fields/fjsql.php</filename>
-    	<filename>fields/index.html</filename>
+    	<folder>fields</folder>
     	<folder>language</folder>
+    	<folder>tmpl</folder>
 	</files>
 	<help url="FJ_RELATED_PLUS_HELP_URL" />
 	<updateservers>
