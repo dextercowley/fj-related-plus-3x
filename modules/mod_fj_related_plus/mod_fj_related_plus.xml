@@ -2,12 +2,12 @@
 <extension method="upgrade" type="module" version="3.0.0" client="site">
 	<name>mod_fj_related_plus</name>
 	<author>Mark Dexter</author>
-	<creationDate>January 2014</creationDate>
+	<creationDate>February 2014</creationDate>
 	<copyright>(C) 2008-2014 Mark Dexter. All rights reserved.</copyright>
 	<license>http://www.gnu.org/licenses/gpl.html</license>
 	<authorEmail>dextercowley@gmail.com</authorEmail>
 	<authorUrl>http://joomlacode.org/gf/project/freejoomla/wiki/</authorUrl>
-	<version>4.0.0</version>
+	<version>4.0.1</version>
 	<description>DESCFJRELATEDPLUS</description>
 	<files>
 		<filename module="mod_fj_related_plus">mod_fj_related_plus.php</filename>
