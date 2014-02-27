@@ -214,7 +214,7 @@ class modFJRelatedPlusHelper
 				$query->where('(a.publish_down = ' . $db->quote($nullDate) . ' OR a.publish_down >= ' . $db->quote($now) . ')');
 
 				// Plug in the WHERE clause of $selectQuery inside ()
-				$query->where('(' . substr((string) $selectQuery->where, 8) . ')');
+				$query->where('(' . trim(str_ireplace('WHERE', '', (string) $selectQuery->where)) . ')');
 
 				$db->setQuery($query, 0, intval($params->get('count', 5)));
 				$rows = $db->loadObjectList();
