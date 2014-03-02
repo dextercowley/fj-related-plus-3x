@@ -114,9 +114,9 @@ class modFJRelatedPlusHelper
 				// or if the alias match is on and an alias
 				(($matchAuthorAlias) && (self::$mainArticle->created_by_alias)) ||
 				($matchCategory) ||	// or if the match category parameter is yes
-				($includeCategories > ' ') || // or other categories
-				($includeAuthors > ' ') || // or other authors
-				($includeAliases > ' ') || // or other author aliases
+				($includeCategories) || // or other categories
+				($includeAuthors) || // or other authors
+				($includeAliases) || // or other author aliases
 				($includeTags)) // or include tags
 			{
 				$query = self::setDateOrderBy(self::$params);
@@ -129,16 +129,18 @@ class modFJRelatedPlusHelper
 					$query->leftJoin($tagQueryString . ' AS m ON m.content_item_id = a.id');
 					$query->select('m.total_tag_count, m.matching_tag_count AS match_count, m.matching_tags as match_list');
 
+					// Calculate total matches, including tags and other selections (author, alias, category)
+					$totalMatches = '(CASE WHEN m.matching_tag_count IS NULL THEN 0 ELSE m.matching_tag_count END) ';
+
 					// Second query object to allow any / all / exact
 					$selectQuery = self::getSelectQuery($params);
 				}
 				else
 				{
 					$query->select('0 AS total_tag_count, 0 AS match_count, \'\' AS match_list');
+					$totalMatches = '0 ';
+					$selectQuery = JFactory::getDbo()->getQuery(true);
 				}
-
-				// Calculate total matches, including tags and other selections (author, alias, category)
-				$totalMatches = '(CASE WHEN m.matching_tag_count IS NULL THEN 0 ELSE m.matching_tag_count END) ';
 
 				if ($catid > ' ' and (self::$mainArticle->catid > ' '))
 				{
@@ -213,8 +215,8 @@ class modFJRelatedPlusHelper
 				$query->where('(a.publish_up = ' . $db->quote($nullDate) . ' OR a.publish_up <= ' . $db->quote($now) . ' )');
 				$query->where('(a.publish_down = ' . $db->quote($nullDate) . ' OR a.publish_down >= ' . $db->quote($now) . ')');
 
-				// Plug in the WHERE clause of $selectQuery inside ()
-				$query->where('(' . trim(str_ireplace('WHERE', '', (string) $selectQuery->where)) . ')');
+					// Plug in the WHERE clause of $selectQuery inside ()
+					$query->where('(' . trim(str_ireplace('WHERE', '', (string) $selectQuery->where)) . ')');
 
 				$db->setQuery($query, 0, intval($params->get('count', 5)));
 				$rows = $db->loadObjectList();
